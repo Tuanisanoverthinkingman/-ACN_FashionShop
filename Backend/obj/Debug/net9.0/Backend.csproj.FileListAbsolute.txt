@@ -149,3 +149,13 @@ E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\BCrypt.Net-Next.dll
 E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Swashbuckle.AspNetCore.Swagger.dll
 E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.Abstractions.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.JsonWebTokens.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.Logging.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.Tokens.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\System.IdentityModel.Tokens.Jwt.dll
+E:\DoAnChuyenNganh\Backend\obj\Debug\net9.0\Backend.sourcelink.json
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+E:\DoAnChuyenNganh\Backend\bin\Debug\net9.0\Swashbuckle.AspNetCore.Annotations.dll

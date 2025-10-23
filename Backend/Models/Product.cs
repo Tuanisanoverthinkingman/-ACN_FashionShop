@@ -35,6 +35,11 @@ namespace Models
         public int CategoryId { get; set; }
         public Category? Category { get; set; }
 
+        [Required]
+        [ForeignKey("User")]
+        public int UserId { get; set; }
+        public User? User { get; set; }
+
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
     }

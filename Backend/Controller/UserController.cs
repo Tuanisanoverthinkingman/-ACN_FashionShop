@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Models;
 using Microsoft.AspNetCore.Authorization;
-using Org.BouncyCastle.Crypto.Generators;
+
 
 
 namespace Controllers
@@ -28,7 +28,7 @@ namespace Controllers
         }
 
         //Tạo mới người dùng (User)
-        [HttpPost]
+        [HttpPost("User")]
         public async Task<ActionResult<User>> CreateUser(
             [FromBody] CreateUserRequest request)
         {
@@ -40,11 +40,62 @@ namespace Controllers
             var user = new User
             {
                 Username = request.Username,
-                Password = BCrypt.Net.BCrypt.HashPassword(
-                                        request.Password),
+                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 FullName = request.FullName,
                 Email = request.Email,
-                Role = "Nguoidung", // Mặc định là người dùng
+                Role = "User",
+                Phone = request.Phone,
+                IsActive = true
+            };
+
+            _context.users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
+        }
+
+        [HttpPost("Admin")]
+        public async Task<ActionResult<User>> CreateAdmin(
+            [FromBody] CreateUserRequest request)
+        {
+            // Kiểm tra xem Username đã tồn tại chưa
+            if (await _context.users.AnyAsync(
+                u => u.Username == request.Username))
+                return BadRequest("Username đã tồn tại.");
+
+            var user = new User
+            {
+                Username = request.Username,
+                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                FullName = request.FullName,
+                Email = request.Email,
+                Role = "Admin",
+                Phone = request.Phone,
+                IsActive = true
+            };
+
+            _context.users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
+        }
+
+        [HttpPost("Supplier")]
+        public async Task<ActionResult<User>> CreateSupplier(
+            [FromBody] CreateUserRequest request)
+        {
+            // Kiểm tra xem Username đã tồn tại chưa
+            if (await _context.users.AnyAsync(
+                u => u.Username == request.Username))
+                return BadRequest("Username đã tồn tại.");
+
+            var user = new User
+            {
+                Username = request.Username,
+                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                FullName = request.FullName,
+                Email = request.Email,
+                Role = "Supplier",
                 Phone = request.Phone,
                 IsActive = true
             };
@@ -57,6 +108,7 @@ namespace Controllers
 
         // Lấy người dùng
         [HttpGet("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<User>> GetUser(int id)
         {
             var user = await _context.users.FindAsync(id);
@@ -64,6 +116,7 @@ namespace Controllers
             return user;
         }
 
+        [Authorize]
         [HttpGet("me")]
         public async Task<ActionResult<User>> GetCurrentUser()
         {
@@ -80,6 +133,7 @@ namespace Controllers
 
         // Lấy tất cả user
         [HttpGet("getAll")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<User>>> GetAllUser()
         {
             var users = await _context.users.ToListAsync();
@@ -88,6 +142,7 @@ namespace Controllers
 
         // Xoá user
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteUser(int id)
         {
             var user = await _context.users.FindAsync(id);
@@ -101,6 +156,7 @@ namespace Controllers
 
         // Đổi mật khẩu
         [HttpPost("{id}/change-password")]
+        [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordRequest request)
         {
             var user = await _context.users.FindAsync(id);
