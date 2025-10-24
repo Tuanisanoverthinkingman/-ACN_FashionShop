@@ -1,39 +1,46 @@
 using Microsoft.AspNetCore.Mvc;
 using ZstdSharp.Unsafe;
 
-[ApiController]
-[Route("api/files")]
-public class FileController : ControllerBase
+namespace Controllers
 {
-    private readonly IWebHostEnvironment _env;
-    public FileController(IWebHostEnvironment env)
+    [ApiController]
+    [Route("api/files")]
+    public class FileController : ControllerBase
     {
-        _env = env;
-    }
-
-    [HttpPost("upload")]
-    public async Task<IActionResult> UpLoadImage([FromBody] IFormFile file)
-    {
-        Console.WriteLine("WebRootPath: " + _env.WebRootPath);
-        if (file == null || file.Length == 0)
-            return BadRequest("Không có tệp nào được tải lên");
-
-        // Đường dẫn thư mục tải lên (wwwroot/uploads)
-        var uploadPath = Path.Combine(_env.WebRootPath, "uploads");
-        if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
-
-        // Tạo tên tệp duy nhất
-        var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-        var filePath = Path.Combine(uploadPath, fileName);
-
-        // Lưu tệp vào thư mục
-        using (var stream = new FileStream(filePath, FileMode.Create))
+        private readonly IWebHostEnvironment _env;
+        public FileController(IWebHostEnvironment env)
         {
-            await file.CopyToAsync(stream);
+            _env = env;
         }
 
-        // Trả về URL của tệp đã tải lên
-        var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{fileName}";
-        return Ok(new { imageUrl = fileUrl });
+        [HttpPost("upload")]
+        public async Task<IActionResult> UpLoadImage([FromForm] FileUpLoadRequest request)
+        {
+            var file = request.File;
+            if (file == null || file.Length == 0)
+                return BadRequest("Không có tệp nào được tải lên");
+
+            // Đường dẫn thư mục tải lên (wwwroot/uploads)
+            var uploadPath = Path.Combine(_env.WebRootPath, "uploads");
+            if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+            // Tạo tên tệp duy nhất
+            var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+            var filePath = Path.Combine(uploadPath, fileName);
+
+            // Lưu tệp vào thư mục
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Trả về URL của tệp đã tải lên
+            var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{fileName}";
+            return Ok(new { imageUrl = fileUrl });
+        }
+        public class FileUpLoadRequest
+        {
+            public IFormFile File { get; set; }
+        }
     }
 }
