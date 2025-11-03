@@ -1,0 +1,60 @@
+# ========================
+# FRONTEND (Next.js)
+# ========================
+node_modules/
+.next/
+dist/
+out/
+.env
+.env.local
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+.vscode/
+.vercel/
+coverage/
+tmp/
+build/
+
+# ========================
+# BACKEND (.NET)
+# ========================
+bin/
+obj/
+*.user
+*.rsuser
+*.suo
+*.cache
+*.sln.docstates
+*.userprefs
+*.dbmdl
+*.log
+*.pdb
+*.tmp
+
+# Visual Studio specific
+.vs/
+.vscode/
+
+# ASP.NET logs and temporary files
+App_Data/
+App_Start/
+wwwroot/uploads/
+wwwroot/images/
+Logs/
+
+# ========================
+# SYSTEM / OS FILES
+# ========================
+Thumbs.db
+ehthumbs.db
+Icon?
+.idea/
+*.iml
+*.swp
+*.bak
+*.orig
+*.rej
