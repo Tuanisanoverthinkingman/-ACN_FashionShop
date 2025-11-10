@@ -21,7 +21,7 @@ namespace Controllers
             {
                 Console.WriteLine($"Claim Type: {claim.Type}, Value: {claim.Value}");
             }
-            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");  // Lấy giá trị từ claim 'sub'
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
             Console.WriteLine("UserIdClaim: " + User.ToString());
             return userIdClaim != null ? int.Parse(userIdClaim.Value) : (int?)null;
         }

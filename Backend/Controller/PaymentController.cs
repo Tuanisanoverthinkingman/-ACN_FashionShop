@@ -50,12 +50,6 @@ namespace Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var role = User.FindFirstValue(ClaimTypes.Role);
-
-            // var user = await _context.users
-            // .FirstOrDefaultAsync(o => o.Id == userId);
-            // if (user == null)
-            //     return NotFound();
-
             if (role == "Admin")
             {
                 var allPayments = await _context.payments
@@ -65,19 +59,6 @@ namespace Controllers
                 .ToListAsync();
 
                 return Ok(allPayments);
-            }
-
-            if (role == "Supplier")
-            {
-                // Lấy các thanh toán có sản phẩm thuộc về Supplier
-                var supplierPayments = await _context.payments
-                    .Include(p => p.Order)
-                    .ThenInclude(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                    .Where(p => p.Order.OrderDetails.Any(od => od.Product.UserId == userId))
-                    .ToListAsync();
-
-                return Ok(supplierPayments);
             }
 
             var userPayments = await _context.payments
@@ -108,15 +89,6 @@ namespace Controllers
             if (role == "Admin")
                 return Ok(payment);
 
-            if (role == "Supplier")
-            {
-                bool ownsProduct = payment.Order.OrderDetails.Any(od => od.Product.UserId == userId);
-                if (!ownsProduct)
-                    return Forbid();
-
-                return Ok(payment);
-            }
-
             if (payment.Order.UserId != userId)
                 return Forbid();
 
@@ -143,15 +115,6 @@ namespace Controllers
 
             if (role == "Admin")
                 return Ok(payment);
-
-            if (role == "Supplier")
-            {
-                bool ownsProduct = payment.Order.OrderDetails.Any(od => od.Product.UserId == userId);
-                if (!ownsProduct)
-                    return Forbid();
-
-                return Ok(payment);
-            }
 
             if (payment.Order.UserId != userId)
                 return Forbid();

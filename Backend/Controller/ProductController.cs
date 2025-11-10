@@ -16,7 +16,6 @@ namespace Controllers
             _context = context;
         }
 
-        //GET : api/products
         //Lấy toàn bộ sản phẩm
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -28,7 +27,6 @@ namespace Controllers
             return Ok(products);
         }
 
-        //GET: api/products/{id}
         //Lấy sản phẩm theo id
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -41,16 +39,14 @@ namespace Controllers
             return Ok(product);
         }
 
-        //POST: api/products
-        //Thêm sản phẩm (Admin & Supplier)
+        //Thêm sản phẩm (Admin)
         [HttpPost]
-        [Authorize(Roles = "Admin,Supplier")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] CreateProductRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Nếu cần kiểm tra CategoryId hợp lệ
             var category = await _context.categories.FindAsync(request.CategoryId);
             if (category == null)
                 return BadRequest("CategoryId không hợp lệ!");
@@ -73,15 +69,13 @@ namespace Controllers
             _context.products.Add(product);
             await _context.SaveChangesAsync();
 
-            //Lấy lại thông tin Category để trả về đầy đủ
             product.Category = category;
             return Ok(product);
         }
 
-        //PUT: api/products/{id}
-        //Cập nhật sản phẩm (Admin & Supplier)
+        //Cập nhật sản phẩm (Admin)
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Supplier")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] Product request)
         {
             var product = await _context.products.FirstOrDefaultAsync(p => p.Id == id);
@@ -90,12 +84,6 @@ namespace Controllers
 
             var userRole = User.FindFirstValue(ClaimTypes.Role);
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-
-            // Supplier chỉ được sửa sản phẩm của mình
-            if (userRole == "Supplier" && product.UserId != userId)
-            {
-                return Forbid("Bạn không có quyền sửa sản phẩm này.");
-            }
 
             // Nếu muốn kiểm tra lại CategoryId
             var category = await _context.categories.FindAsync(request.CategoryId);
@@ -108,19 +96,15 @@ namespace Controllers
             product.Instock = request.Instock;
             product.ImageUrl = request.ImageUrl;
             product.CategoryId = request.CategoryId;
-            // product.CreateAt giứ nguyên
 
             await _context.SaveChangesAsync();
-
-            //Lấy lại thông tin Category để trả về đầy đủ
             product.Category = category;
             return Ok(product);
         }
 
-        // DELETE: api/products/{id}
-        //Xoá sản phẩm (Admin & Supplier)
+        //Xoá sản phẩm (Admin)
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin,Supplier")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var product = await _context.products.FirstOrDefaultAsync(p => p.Id == id);
@@ -130,19 +114,13 @@ namespace Controllers
             var userRole = User.FindFirstValue(ClaimTypes.Role);
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
 
-            // Nếu là Supplier thì chỉ được xóa sản phẩm của chính mình
-            if (userRole == "Supplier" && product.UserId != userId)
-            {
-                return Forbid("Bạn không có quyền xóa sản phẩm này.");
-            }
-
             _context.products.Remove(product);
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Xóa sản phẩm thành công." });
         }
 
-        // GET: api/products/by-category/{categoryId}
+        // Lấy sp bằng mã DM
         [HttpGet("by-category/{categoryId}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetByCategory(int categoryId)
@@ -159,7 +137,6 @@ namespace Controllers
             return Ok(products);
         }
 
-        // DTO dùng để tạo sản phẩm
         public class CreateProductRequest
         {
             public string Name { get; set; }

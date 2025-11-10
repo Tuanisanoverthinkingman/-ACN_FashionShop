@@ -87,6 +87,7 @@ namespace Controllers
 
         //Admin: Xem tất cả đơn hàng
         [HttpGet("getAll")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllOrders()
         {
             var orders = await _context.orders
@@ -113,6 +114,7 @@ namespace Controllers
 
         //Lấy đơn hàng theo ID
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<IActionResult> GetOrderById(int id)
         {
             var order = await _context.orders
@@ -123,7 +125,8 @@ namespace Controllers
             if (order == null) return NotFound();
 
             var userId = GetUserIdFromClaims();
-            if (order.UserId != userId)
+            var user = await _context.users.FirstOrDefaultAsync(c => c.Id == userId);
+            if (user.Role != "Admin" && order.UserId != userId)
                 return Forbid();
             return Ok(order);
         }

@@ -80,32 +80,6 @@ namespace Controllers
             return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
         }
 
-        [HttpPost("Supplier")]
-        public async Task<ActionResult<User>> CreateSupplier(
-            [FromBody] CreateUserRequest request)
-        {
-            // Kiểm tra xem Username đã tồn tại chưa
-            if (await _context.users.AnyAsync(
-                u => u.Username == request.Username))
-                return BadRequest("Username đã tồn tại.");
-
-            var user = new User
-            {
-                Username = request.Username,
-                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                FullName = request.FullName,
-                Email = request.Email,
-                Role = "Supplier",
-                Phone = request.Phone,
-                IsActive = true
-            };
-
-            _context.users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
-        }
-
         // Lấy người dùng
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin")]

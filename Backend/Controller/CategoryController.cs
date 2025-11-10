@@ -20,7 +20,7 @@ namespace Controllers
 
         //Tạo mới danh mục
         [HttpPost]
-        [Authorize(Roles = "Admin,Supplier")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<Category>> CreateCategory([FromBody] CategoryRequest request)
         {
             try
@@ -63,7 +63,7 @@ namespace Controllers
 
         //Cập nhật danh mục
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Supplier")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateCategory(int id, [FromBody] CategoryRequest request)
         {
             var category = await _context.categories.FirstOrDefaultAsync(q => q.Id == id);
@@ -72,10 +72,6 @@ namespace Controllers
 
             var userRole = User.FindFirstValue(ClaimTypes.Role);
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-
-            // Supplier chỉ cập nhật danh mục của mình
-            if (userRole == "Supplier" && category.UserId != userId)
-                return Forbid("Bạn không có quyền cập nhật danh mục này.");
 
             category.Name = request.Name;
             category.Description = request.Description;

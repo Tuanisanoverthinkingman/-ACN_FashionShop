@@ -11,11 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 //Add database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("MySQLConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("MySQLConnection"))
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("SQLServerConnection")
     )
 );
+
 
 // Thêm Controller + cấu hình JSON để bỏ qua vòng lặp tham chiếu
 builder.Services.AddControllers()

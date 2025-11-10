@@ -17,7 +17,6 @@ namespace Controllers
             _context = context;
         }
 
-        //GET: api/orderdetails/order/{orderId}
         [HttpGet("order/{orderId}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetByOrderId(int orderId)
@@ -33,7 +32,6 @@ namespace Controllers
         }
 
         // Chỉ người dùng đã mua mới xem được chi tiết đơn hàng
-        // GET: api/orderdetails/user/{orderId}
         [HttpGet("user/{orderId}")]
         [Authorize]
         public async Task<IActionResult> GetByUser(int orderId)
