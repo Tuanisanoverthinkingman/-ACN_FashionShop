@@ -91,9 +91,6 @@ namespace Controllers
             if (userId == null)
                 return Unauthorized("Không tìm thấy người dùng.");
 
-            Console.WriteLine("ProductId: " + request.ProductId);
-            Console.WriteLine(request.Quantity);
-
             var cartItems = await _context.cartItems.FirstOrDefaultAsync(c => c.UserId == userId && c.ProductId == request.ProductId);
             if (cartItems == null)
                 return NotFound("Không tìm thấy sản phẩm trong giỏ hàng");

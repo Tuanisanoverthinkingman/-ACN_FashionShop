@@ -14,7 +14,6 @@ public class YameScraperService : IAsyncDisposable
     {
         _browser = new Lazy<Task<IBrowser>>(async () =>
         {
-            // Tải trình duyệt (nếu cần)
             await new BrowserFetcher().DownloadAsync();
             return await Puppeteer.LaunchAsync(new LaunchOptions
             {
@@ -41,7 +40,7 @@ public class YameScraperService : IAsyncDisposable
         return price;
     }
 
-    // --- HÀM 1: LẤY DANH SÁCH TỪ TRANG CHỦ (ĐÃ SỬA THEO HTML MỚI) ---
+    // --- HÀM 1: LẤY DANH SÁCH TỪ TRANG CHỦ ---
     public async Task<List<ScrapedProduct>> GetHomepageProductsAsync()
     {
         var products = new List<ScrapedProduct>();
@@ -58,8 +57,6 @@ public class YameScraperService : IAsyncDisposable
             Console.WriteLine($"Lỗi khi tải trang chủ bằng Puppeteer: {ex.Message}");
             return products;
         }
-
-        // === SỬA LỖI CATEGORY: Dùng selector mới dựa trên HTML bạn cung cấp ===
         
         // 1. Tìm tất cả các "div" chứa CẢ tiêu đề (h2.title) VÀ lưới sản phẩm (ul.product-grid)
         var sections = await page.QuerySelectorAllAsync("div[class*='collection']:has(h2.title):has(ul.product-grid)");
@@ -96,11 +93,6 @@ public class YameScraperService : IAsyncDisposable
                 var imgNode = await item.QuerySelectorAsync("img.motion-reduce");
                 string imageUrl = imgNode != null ? await imgNode.EvaluateFunctionAsync<string>("e => e.getAttribute('src')") : "N/A";
                 if (imageUrl != null && imageUrl.StartsWith("//")) imageUrl = "https:" + imageUrl;
-
-                // --- LOGIC LẤY GIÁ (Dùng CSS Selector) ---
-                // HTML bạn gửi cho thấy có 2 giá:
-                // 1. Giá bán (sale): span.price-item--sale
-                // 2. Giá gốc (bị gạch): s.price-item--regular
                 
                 var salePriceNode = await item.QuerySelectorAsync("span.price-item--sale");
                 var regularPriceNode = await item.QuerySelectorAsync("s.price-item--regular");
@@ -110,16 +102,14 @@ public class YameScraperService : IAsyncDisposable
 
                 if (salePriceNode != null && regularPriceNode != null)
                 {
-                    // Trường hợp CÓ GIẢM GIÁ
                     salePriceStr = await salePriceNode.EvaluateFunctionAsync<string>("e => e.innerText.trim()");
                     regularPriceStr = await regularPriceNode.EvaluateFunctionAsync<string>("e => e.innerText.trim()");
                 }
                 else
                 {
-                    // Trường hợp KHÔNG GIẢM GIÁ (chỉ có 1 giá)
                     var currentPriceNode = await item.QuerySelectorAsync("span.price-item--regular");
                     salePriceStr = currentPriceNode != null ? await currentPriceNode.EvaluateFunctionAsync<string>("e => e.innerText.trim()") : "0 VND";
-                    regularPriceStr = salePriceStr; // Giá gốc bằng giá bán
+                    regularPriceStr = salePriceStr;
                     
                     if(currentPriceNode != null) await currentPriceNode.DisposeAsync();
                 }
@@ -129,20 +119,18 @@ public class YameScraperService : IAsyncDisposable
                 
                 if (salePriceNode != null) await salePriceNode.DisposeAsync();
                 if (regularPriceNode != null) await regularPriceNode.DisposeAsync();
-                // --- KẾT THÚC LOGIC GIÁ ---
 
                 products.Add(new ScrapedProduct
                 {
                     Name = name,
                     FullUrl = BaseUrl + relativeUrl,
                     ImageUrl = imageUrl,
-                    SalePrice = salePrice, // Giá này là giá bán (đã fix)
+                    SalePrice = salePrice,
                     RegularPrice = regularPrice,
-                    SourceSection = sectionTitle, // Gán tên Category đã tìm được
+                    SourceSection = sectionTitle,
                     Description = null 
                 });
 
-                // Dọn dẹp
                 await headingNode.DisposeAsync();
                 if (imgNode != null) await imgNode.DisposeAsync();
             }
@@ -151,7 +139,7 @@ public class YameScraperService : IAsyncDisposable
         return products;
     }
 
-    // --- HÀM 2: LẤY CHI TIẾT SẢN PHẨM (ĐÃ SỬA) ---
+    // --- HÀM 2: LẤY CHI TIẾT SẢN PHẨM ---
     public async Task<ScrapedProduct> GetProductDetailsAsync(ScrapedProduct product)
     {
         if (string.IsNullOrEmpty(product.FullUrl) || product.FullUrl == BaseUrl)

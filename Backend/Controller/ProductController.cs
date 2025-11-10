@@ -16,7 +16,6 @@ namespace Controllers
             _context = context;
         }
 
-        //GET : api/products
         //Lấy toàn bộ sản phẩm
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -28,7 +27,6 @@ namespace Controllers
             return Ok(products);
         }
 
-        //GET: api/products/{id}
         //Lấy sản phẩm theo id
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -41,7 +39,6 @@ namespace Controllers
             return Ok(product);
         }
 
-        //POST: api/products
         //Thêm sản phẩm (Admin & Supplier)
         [HttpPost]
         [Authorize(Roles = "Admin,Supplier")]
@@ -78,7 +75,6 @@ namespace Controllers
             return Ok(product);
         }
 
-        //PUT: api/products/{id}
         //Cập nhật sản phẩm (Admin & Supplier)
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin,Supplier")]

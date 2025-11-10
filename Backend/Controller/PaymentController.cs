@@ -51,11 +51,6 @@ namespace Controllers
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var role = User.FindFirstValue(ClaimTypes.Role);
 
-            // var user = await _context.users
-            // .FirstOrDefaultAsync(o => o.Id == userId);
-            // if (user == null)
-            //     return NotFound();
-
             if (role == "Admin")
             {
                 var allPayments = await _context.payments
@@ -159,7 +154,7 @@ namespace Controllers
             return Ok(payment);
         }
 
-        // Cập nhật trạng thái thanh toán (chỉ chủ đơn hàng hoặc hệ thống gọi)
+        // Cập nhật trạng thái thanh toán (hệ thống gọi)
         [HttpPut("update-status/{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] PaymentStatus newStatus)

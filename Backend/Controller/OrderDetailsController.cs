@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Models;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Controllers
 {
@@ -17,23 +18,30 @@ namespace Controllers
             _context = context;
         }
 
+        // Lấy userId từ token
+        private int GetUserIdFromClaims()
+        {
+            var subClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                        ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(subClaim, out var userId) ? userId : 0;
+        }
+
         //GET: api/orderdetails/order/{orderId}
         [HttpGet("order/{orderId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> GetByOrderId(int orderId)
         {
             var order = await _context.orders
             .Include(o => o.OrderDetails!)
             .ThenInclude(od => od.Product)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
-
+            int currentUserId = GetUserIdFromClaims();
+            if (order.UserId != currentUserId) return Forbid();
             if (order == null) return NotFound("Không tìm thấy đơn hàng.");
-
             return Ok(order.OrderDetails);
         }
 
         // Chỉ người dùng đã mua mới xem được chi tiết đơn hàng
-        // GET: api/orderdetails/user/{orderId}
         [HttpGet("user/{orderId}")]
         [Authorize]
         public async Task<IActionResult> GetByUser(int orderId)
