@@ -11,18 +11,32 @@ export default function NavBar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    const fetchCart = async () => {
-      try {
-        const data = await getCart();
-        if (data && data.length) setCartCount(data.length);
-      } catch (err) {
-        console.error("Lỗi khi lấy giỏ hàng:", err);
-      }
-    };
-    fetchCart();
-  }, []);
+  
+    useEffect(() => {
+      const fetchCart = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          if (!token) {
+            // Nếu chưa đăng nhập thì không gọi API
+            setCartCount(0);
+            return;
+          }
+  
+          const cartData = await getCart();
+          // Nếu API trả về danh sách sản phẩm trong giỏ hàng
+          const totalItems = cartData.reduce(
+            (sum: number, item: any) => sum + item.quantity,
+            0
+          );
+          setCartCount(totalItems);
+        } catch (err) {
+          console.error("Lỗi khi tải giỏ hàng:", err);
+          setCartCount(0);
+        }
+      };
+  
+      fetchCart();
+    }, []);
 
   // 👇 Theo dõi cuộn để đổi màu nền navbar
   useEffect(() => {

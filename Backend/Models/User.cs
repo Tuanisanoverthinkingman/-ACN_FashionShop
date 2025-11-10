@@ -27,7 +27,7 @@ namespace Models
 
         [Required]
         [Column(TypeName = "varchar(30)")]
-        public string Role { get; set; } // Admin, Người dùng, Người cung cấp
+        public string Role { get; set; } // Admin, Người dùng
 
         [Required]
         [Column(TypeName = "varchar(100)")]

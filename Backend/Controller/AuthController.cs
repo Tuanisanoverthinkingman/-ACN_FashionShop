@@ -81,19 +81,16 @@ public class AuthController : Controller
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    // Thêm hàm này vào UserController (hoặc AuthController, v.v.)
     [HttpGet("debug-claims")]
-    [Authorize] // Chỉ cần đăng nhập là được
+    [Authorize]
     public IActionResult DebugClaims()
     {
-        // Lấy tất cả các claim mà server đọc được từ token
         var claims = User.Claims.Select(c => new 
         {
-            Type = c.Type, // Đây là tên của claim
-            Value = c.Value  // Đây là giá trị
+            Type = c.Type,
+            Value = c.Value
         }).ToList();
 
-        // Trả về một JSON chứa tất cả claim
         return Ok(claims);
     }
 }
