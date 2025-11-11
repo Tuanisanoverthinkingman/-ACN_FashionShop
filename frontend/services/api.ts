@@ -1,4 +1,5 @@
 import axios from "axios";
+import { error } from "console";
 import { config } from "process";
 
 const api = axios.create({
@@ -12,5 +13,24 @@ api.interceptors.request.use((config) => {
     }
     return config;
 });
+
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401){
+            console.warn("Token hết hạn hoặc không hợp lệ! Đang đăng xuất!");
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+
+            window.dispatchEvent(
+                new Event("userChanged")
+            );
+            if (typeof window !== "undefined"){
+                window.location.href = "/";
+            }
+        }
+        return Promise.reject(error);
+    } 
+);
 
 export default api;

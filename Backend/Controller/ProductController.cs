@@ -122,7 +122,6 @@ namespace Controllers
 
         // Lấy sp bằng mã DM
         [HttpGet("by-category/{categoryId}")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
             var products = await _context.products

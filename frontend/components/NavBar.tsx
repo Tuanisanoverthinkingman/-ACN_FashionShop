@@ -5,44 +5,84 @@ import Link from "next/link";
 import { ShoppingCart, Search, User } from "lucide-react";
 import { getCart } from "@/services/cart-services";
 import { useRouter } from "next/navigation";
+import {logout} from "@/services/auth-services"
 
-export default function NavBar() {
+interface NavBarProps {
+  onLoginClick?: () => void;
+}
+
+export default function NavBar({onLoginClick}: NavBarProps) {
   const [cartCount, setCartCount] = useState(0);
   const [userName, setUserName] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
   const router = useRouter();
   
-    useEffect(() => {
-      const fetchCart = async () => {
-        try {
-          const token = localStorage.getItem("token");
-          if (!token) {
-            // Nếu chưa đăng nhập thì không gọi API
-            setCartCount(0);
-            return;
-          }
-  
-          const cartData = await getCart();
-          // Nếu API trả về danh sách sản phẩm trong giỏ hàng
-          const totalItems = cartData.reduce(
-            (sum: number, item: any) => sum + item.quantity,
-            0
-          );
-          setCartCount(totalItems);
-        } catch (err) {
-          console.error("Lỗi khi tải giỏ hàng:", err);
-          setCartCount(0);
-        }
-      };
-  
-      fetchCart();
-    }, []);
+  useEffect(() => {
+    const checkUser = () => {
+      const user = localStorage.getItem("user");
+      if (user) setUserName(JSON.parse(user).username);
+      else setUserName(null);
+    };
 
-  // 👇 Theo dõi cuộn để đổi màu nền navbar
+    // Check khi mount
+    checkUser();
+
+    // Lắng nghe sự kiện userChanged
+    window.addEventListener("userChanged", checkUser);
+
+    return () => {
+      window.removeEventListener("userChanged", checkUser);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".relative")) {
+        setShowMenu(false);
+      }
+    };
+
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
+  
+  // Theo dõi cuộn để đổi màu nền navbar
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const updateCartCount = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setCartCount(0);
+          return;
+        }
+        const cartData = await getCart();
+        const totalItems = cartData.reduce(
+          (sum: number, item: any) => sum + item.quantity,
+          0
+        );
+        setCartCount(totalItems);
+      } catch (err) {
+        console.error(err);
+        setCartCount(0);
+      }
+    };
+
+    // Cập nhật khi mount
+    updateCartCount();
+
+    // Lắng nghe event cartChanged
+    window.addEventListener("cartChanged", updateCartCount);
+
+    return () => window.removeEventListener("cartChanged", updateCartCount);
   }, []);
 
   const handleCartClick = (e: React.MouseEvent) => {
@@ -59,7 +99,7 @@ export default function NavBar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-        {/* 🌟 Logo + tên thương hiệu */}
+        {/* Logo + tên thương hiệu */}
         <Link href="/" className="flex items-center gap-3">
           <img
             src="/image/NovaLogo.png"
@@ -73,7 +113,14 @@ export default function NavBar() {
 
         {/* 🔍 Icons */}
         <div className="flex items-center gap-6">
-          <button className="hover:opacity-80 transition">
+          <button
+            onClick={() => {
+              const section = document.getElementById("search");
+              if (section) {
+                section.scrollIntoView({ behavior: "smooth" });
+              }
+            }}
+            className="hover:opacity-80 transition">
             <Search size={22} />
           </button>
 
@@ -90,18 +137,46 @@ export default function NavBar() {
           </button>
 
           {userName ? (
-            <div className="flex items-center gap-2">
-              <User size={20} />
-              <span className="text-sm font-medium">{userName}</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="flex items-center gap-2 hover:opacity-80 transition"
+              >
+                <User size={20} />
+                <span className="text-sm font-medium">{userName}</span>
+              </button>
+
+              {showMenu && (
+                <div 
+                  className="absolute right-0 mt-2 w-40 bg-white text-gray-800 shadow-lg rounded-lg overflow-hidden z-50">
+                  <Link
+                    href="/app/account"
+                    className="block px-4 py-2 hover:bg-gray-100 transition"
+                    onClick={() => setShowMenu(false)}
+                  >
+                    Tài khoản
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setShowMenu(false);
+                      router.push("/")
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 transition"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
-            <Link
-              href="/login"
+            <button
+              onClick={onLoginClick}
               className="flex items-center gap-2 hover:opacity-80 transition"
             >
               <User size={20} />
               <span className="text-sm font-medium">Đăng nhập</span>
-            </Link>
+            </button>
           )}
         </div>
       </div>

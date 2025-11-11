@@ -20,11 +20,6 @@ export const createUser = async (data: any) => {
     return res.data;
 };
 
-export const createSupplier = async (data: any) => {
-    const res = await api.post("/api/users/Supplier", data);
-    return res.data;
-};
-
 export const updatePassword = async (id: number, oldPasswold: any, newPassword: any) => {
     const res = await api.put(`/api/users/${id}/change-password`, {
         oldPasswoldRequest: oldPasswold,

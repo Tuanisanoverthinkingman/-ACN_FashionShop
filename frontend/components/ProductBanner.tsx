@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getAll as getProducts } from "@/services/product-services";
 import { getAll as getCategories } from "@/services/category-services";
+import { createCart } from "@/services/cart-services";
 import { motion } from "framer-motion";
 
 export default function ProductBanner() {
@@ -28,29 +29,22 @@ export default function ProductBanner() {
         console.error("Error fetching data:", error);
       }
     };
-
     fetchData();
   }, []);
 
-  // Lọc và sắp xếp sản phẩm
   useEffect(() => {
     let result = products;
 
-    // Lọc theo danh mục
     if (selectedCategory !== "all") {
-      result = result.filter(
-        (p) => p.categoryId === parseInt(selectedCategory)
-      );
+      result = result.filter((p) => p.categoryId === parseInt(selectedCategory));
     }
 
-    // Lọc theo từ khóa tìm kiếm
     if (searchTerm.trim() !== "") {
       result = result.filter((p) =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Sắp xếp theo giá
     if (sortOption === "price-asc") {
       result = result.sort((a, b) => a.price - b.price);
     } else if (sortOption === "price-desc") {
@@ -60,17 +54,32 @@ export default function ProductBanner() {
     setFilteredProducts([...result]);
   }, [selectedCategory, searchTerm, sortOption, products]);
 
+  const handleAddToCart = async (productId: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        window.dispatchEvent(new Event("showLogin"));
+        return;
+      }
+
+      await createCart({ productId, quantity: 1 });
+      alert("Thêm vào giỏ hàng thành công! 🛒");
+
+      // Thông báo cho Navbar cập nhật số lượng
+      window.dispatchEvent(new Event("cartChanged"));
+    } catch (err) {
+      console.error("Lỗi thêm vào giỏ hàng:", err);
+      alert("Thêm vào giỏ hàng thất bại 😢");
+    }
+  };
+
   return (
     <section className="py-12 bg-gray-50 font-['Times_New_Roman']">
       <div className="max-w-7xl mx-auto px-4">
-        {/* Tiêu đề */}
-        <h2 className="text-3xl font-bold text-center mb-8">
-          Sản phẩm nổi bật
-        </h2>
+        <h2 className="text-3xl font-bold text-center mb-8">Sản phẩm nổi bật</h2>
 
         {/* Bộ lọc + tìm kiếm + sắp xếp */}
         <div className="flex flex-col gap-4 mb-8">
-          {/* Danh mục (cuộn ngang) */}
           <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
             <button
               onClick={() => setSelectedCategory("all")}
@@ -97,8 +106,9 @@ export default function ProductBanner() {
             ))}
           </div>
 
-          {/* Search + Sort */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div 
+            id = "search"
+            className="flex flex-col md:flex-row justify-between items-center gap-4 scroll-mt-24">
             <input
               type="text"
               placeholder="🔍 Tìm kiếm sản phẩm..."
@@ -132,7 +142,7 @@ export default function ProductBanner() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
+                className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col"
               >
                 <Link href={`/product/${product.id}`}>
                   <img
@@ -140,18 +150,27 @@ export default function ProductBanner() {
                     alt={product.name}
                     className="w-full h-56 object-cover hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg text-gray-800 line-clamp-2 mb-2">
-                      {product.name}
-                    </h3>
-                    <p className="text-gray-500 text-sm mb-3 line-clamp-2">
-                      {product.description || "Không có mô tả."}
-                    </p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {product.price?.toLocaleString()}₫
-                    </p>
-                  </div>
                 </Link>
+
+                <div className="p-4 flex flex-col flex-grow">
+                  <h3 className="font-semibold text-lg text-gray-800 line-clamp-2 mb-2">
+                    {product.name}
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-3 line-clamp-3">
+                    {product.description || "Không có mô tả."}
+                  </p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {product.price?.toLocaleString()}₫
+                  </p>
+                  <div className="mt-auto flex justify-center">
+                    <button
+                      onClick={() => handleAddToCart(product.id)}
+                      className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+                    >
+                      Thêm vào giỏ hàng 🛒
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
