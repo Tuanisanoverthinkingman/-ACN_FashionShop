@@ -140,7 +140,6 @@ namespace Controllers
 
         // GET: api/products/by-category/{categoryId}
         [HttpGet("by-category/{categoryId}")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
             var products = await _context.products

@@ -50,17 +50,27 @@ namespace Controllers
             if (userIdClaim == null) return Unauthorized("Không tìm thấy thông tin người dùng.");
 
             var userId = int.Parse(userIdClaim.Value);
-            Console.WriteLine($"Đã gọi API lấy chi tiết đơn hàng {orderId} bởi user {userId}");
+
             var order = await _context.orders
-            .Include(o => o.OrderDetails!)
-            .ThenInclude(od => od.Product)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+                .Include(o => o.OrderDetails!)
+                .ThenInclude(od => od.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null) return NotFound("Không tìm thấy đơn hàng.");
-
             if (order.UserId != userId) return Forbid("Bạn không có quyền truy cập đơn hàng này.");
 
-            return Ok(order.OrderDetails);
+            return Ok(new {
+                fullName = order.FullName,
+                phone = order.Phone,
+                address = order.Address,
+                note = order.Note,
+                orderDetails = order.OrderDetails.Select(od => new {
+                    productName = od.Product!.Name,
+                    imageUrl = od.Product.ImageUrl,
+                    quantity = od.Quantity,
+                    unitPrice = od.UnitPrice
+                })
+            });
         }
     }
 }

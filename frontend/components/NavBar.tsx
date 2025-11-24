@@ -49,7 +49,7 @@ export default function NavBar() {
   /* 📌 Nhận sự kiện thêm vào giỏ hàng từ ProductBanner */
   useEffect(() => {
     function updateCart(e: any) {
-      const added = e.detail?.added || 0; // số lượng được thêm
+      const added = e.detail?.added || 0;
       setCartCount((prev) => prev + added);
     }
 
@@ -84,7 +84,7 @@ export default function NavBar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  /* 📌 Đóng menu user khi click bên ngoài */
+  /* 📌 Đóng menu user khi click ngoài */
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
@@ -110,7 +110,7 @@ export default function NavBar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-        
+
         {/* LOGO */}
         <Link href="/" className="flex items-center gap-3">
           <img
@@ -124,12 +124,32 @@ export default function NavBar() {
         </Link>
 
         <div className="flex items-center gap-6">
-          <button className="hover:opacity-80 transition">
+          {/* SEARCH */}
+          <button
+            onClick={() => {
+              const searchBox = document.getElementById("product-search");
+              if (searchBox) {
+                searchBox.scrollIntoView({ behavior: "smooth", block: "center" });
+                searchBox.focus();
+              }
+            }}
+            className="hover:opacity-80 transition"
+          >
             <Search size={22} />
           </button>
 
-          {/* CART */}
-          <Link href="/cart" className="relative hover:opacity-80 transition">
+          {/* ⭐ GIỎ HÀNG — ĐÃ SỬA TRỰC TIẾP ⭐ */}
+          <button
+            onClick={() => {
+              const token = localStorage.getItem("token");
+              if (!token) {
+                router.push("/login");   // ⭐ Chuyển đến login nếu chưa đăng nhập
+                return;
+              }
+              router.push("/cart"); // ⭐ Nếu đã đăng nhập → vào giỏ hàng
+            }}
+            className="relative hover:opacity-80 transition"
+          >
             <ShoppingCart size={22} />
 
             {cartCount > 0 && (
@@ -137,7 +157,7 @@ export default function NavBar() {
                 {cartCount}
               </span>
             )}
-          </Link>
+          </button>
 
           {/* USER */}
           {userName ? (

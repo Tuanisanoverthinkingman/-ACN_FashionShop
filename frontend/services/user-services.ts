@@ -25,10 +25,10 @@ export const createSupplier = async (data: any) => {
     return res.data;
 };
 
-export const updatePassword = async (id: number, oldPasswold: any, newPassword: any) => {
+export const updatePassword = async (id: number, oldPassword: string, newPassword: string) => {
     const res = await api.put(`/api/users/${id}/change-password`, {
-        oldPasswoldRequest: oldPasswold,
-        newPasswordRequest: newPassword,
+        oldPassword: oldPassword,
+        newPassword: newPassword,
     });
     return res.data;
 };
@@ -36,4 +36,9 @@ export const updatePassword = async (id: number, oldPasswold: any, newPassword: 
 export const deleteUser = async (id: number) => {
     const res = await api.delete(`/api/users/${id}`);
     return res.data;
+};
+
+export const updateUser = async (id: number, data: any) => {
+  const res = await api.put(`/api/users/${id}`, data);
+  return res.data;
 };

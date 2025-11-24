@@ -93,7 +93,7 @@ const SlideContent = ({ product }: { product: Product }) => {
         animate={isActive ? "visible" : "hidden"}
       >
         <Link
-          href={`/product/${product.id}`}
+          href={`/products/${product.id}`}
           className="inline-block text-base md:text-lg font-medium text-white border-2 border-white px-8 py-3 rounded-lg shadow-md hover:bg-white hover:text-black hover:shadow-lg transition-all duration-300"
         >
           🛍️ Xem chi tiết

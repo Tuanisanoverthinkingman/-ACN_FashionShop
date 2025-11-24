@@ -6,8 +6,10 @@ import { getAll as getProducts } from "@/services/product-services";
 import { getAll as getCategories } from "@/services/category-services";
 import { motion } from "framer-motion";
 import { createCart } from "@/services/cart-services";
+import { useRouter } from "next/navigation";
 
 export default function ProductBanner() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
@@ -35,14 +37,11 @@ export default function ProductBanner() {
     fetchData();
   }, []);
 
-  // Lọc và sắp xếp sản phẩm
   useEffect(() => {
     let result = [...products];
 
     if (selectedCategory !== "all") {
-      result = result.filter(
-        (p) => p.categoryId === parseInt(selectedCategory)
-      );
+      result = result.filter((p) => p.categoryId === parseInt(selectedCategory));
     }
 
     if (searchTerm.trim() !== "") {
@@ -97,6 +96,7 @@ export default function ProductBanner() {
         {/* Search + Sort */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <input
+            id="product-search"
             type="text"
             placeholder="Tìm kiếm sản phẩm..."
             value={searchTerm}
@@ -130,34 +130,42 @@ export default function ProductBanner() {
                 />
                 <h3 className="text-lg font-semibold">{product.name}</h3>
                 <p className="text-gray-600 mt-1">
-                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price)}
+                  {new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  }).format(product.price)}
                 </p>
               </Link>
-              
+
               {/* Nút thêm vào giỏ hàng */}
               <button
-                onClick={async () => {
-                  try {
-                    const token = localStorage.getItem("token");
-                    if (!token) {
-                      alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!");
-                      return;
-                    }
-                    await createCart({ productId: product.id, quantity: 1 });
+  onClick={async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
 
-                    // Bắn CustomEvent với số lượng thêm trực tiếp
-                    window.dispatchEvent(new CustomEvent("cartChanged", { detail: { added: 1 } }));
+      await createCart({ productId: product.id, quantity: 1 });
 
-                    alert("Đã thêm sản phẩm vào giỏ hàng 🛒");
-                  } catch (err) {
-                    console.error(err);
-                    alert("Thêm vào giỏ hàng thất bại 😢");
-                  }
-                }}
-                className="mt-3 bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
-              >
-                Thêm vào giỏ hàng
-              </button>
+      // Phát sự kiện để component khác có thể cập nhật giỏ hàng
+      window.dispatchEvent(
+        new CustomEvent("cartChanged", { detail: { added: 1 } })
+      );
+
+      // Xóa alert
+      // alert("Đã thêm sản phẩm vào giỏ hàng 🛒");
+    } catch (err) {
+      console.error(err);
+      // Bạn vẫn có thể thông báo lỗi nếu muốn
+      // alert("Thêm vào giỏ hàng thất bại 😢");
+    }
+  }}
+  className="mt-3 bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
+>
+  Thêm vào giỏ hàng
+</button>
             </motion.div>
           ))}
           {filteredProducts.length === 0 && (

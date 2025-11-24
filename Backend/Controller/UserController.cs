@@ -154,6 +154,48 @@ namespace Controllers
             return NoContent();
         }
 
+        //Cập nhật thông tin trang cá nhân
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserRequest request)
+        {
+            var user = await _context.users.FindAsync(id);
+            if (user == null)
+                return NotFound("Không tìm thấy người dùng.");
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var roleClaim = User.FindFirst(ClaimTypes.Role);
+
+            // Người dùng chỉ được sửa chính họ
+            if (roleClaim.Value != "Admin" && userIdClaim.Value != id.ToString())
+                return Forbid("Bạn không có quyền sửa thông tin người khác.");
+
+            // Cập nhật dữ liệu
+            user.FullName = request.FullName ?? user.FullName;
+            user.Email = request.Email ?? user.Email;
+            user.Phone = request.Phone ?? user.Phone;
+
+            // Chỉ Admin mới có quyền bật/tắt tài khoản
+            if (roleClaim.Value == "Admin" && request.IsActive.HasValue)
+                user.IsActive = request.IsActive.Value;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Cập nhật thông tin thành công!",
+                user
+            });
+        }
+
+        public class UpdateUserRequest
+        {
+            public string? FullName { get; set; }
+            public string? Email { get; set; }
+            public string? Phone { get; set; }
+            public bool? IsActive { get; set; }
+        }
+
         // Đổi mật khẩu
         [HttpPut("{id}/change-password")]
         [Authorize]
