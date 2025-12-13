@@ -8,7 +8,8 @@ namespace Models
         Pending,
         Paid,
         Failed,
-        Refunded
+        Refunded,
+        Cancelled
     }
 
     [Table("payments")]
@@ -35,7 +36,13 @@ namespace Models
         [Required]
         public PaymentStatus Status { get; set; } // "Pending", "Paid", "Failed", "Refunded", v.v.
 
+        [Required]
+        public string Address { get; set; }
+
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
+        public int? PromoId { get; set; }
+        [ForeignKey("PromoId")]
+        public Promotion? Promotion { get; set; }
     }
 }

@@ -18,12 +18,12 @@ namespace Controllers
             _context = context;
         }
 
-        // Lấy userId từ token
         private int GetUserIdFromClaims()
         {
-            var subClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                        ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(subClaim, out var userId) ? userId : 0;
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            return int.TryParse(sub, out int id) ? id : 0;
         }
 
         // Tạo đơn hàng từ giỏ hàng
@@ -36,22 +36,27 @@ namespace Controllers
                 var userId = GetUserIdFromClaims();
 
                 if (cartItemIds == null || !cartItemIds.Any())
-                    return BadRequest("Bạn chưa chọn sản phẩm nào!");
+                    return BadRequest(new { message = "Bạn chưa chọn sản phẩm nào!" });
 
                 var selectedItems = await _context.cartItems
-                .Include(c => c.Product)
-                .Where(c => c.UserId == userId && cartItemIds.Contains(c.CartItemId))
-                .ToListAsync();
+                    .Include(c => c.Product)
+                    .Where(c => c.UserId == userId && cartItemIds.Contains(c.CartItemId))
+                    .ToListAsync();
+
+                if (!selectedItems.Any())
+                    return BadRequest(new { message = "Không tìm thấy sản phẩm trong giỏ hàng!" });
 
                 if (selectedItems.Any(c => c.Product == null))
-                    return BadRequest("Một số sản phẩm không tồn tại");
-                var total = selectedItems.Sum(c => c.Product.Price * c.Quantity);
+                    return BadRequest(new { message = "Một số sản phẩm không tồn tại!" });
+
+                decimal total = selectedItems.Sum(c => c.Product.Price * c.Quantity);
 
                 var newOrder = new Order
                 {
                     UserId = userId,
                     TotalAmount = total,
-                    OrderDate = DateTime.Now
+                    OrderDate = DateTime.Now,
+                    OrderStatus = "Pending"
                 };
 
                 _context.orders.Add(newOrder);
@@ -59,92 +64,102 @@ namespace Controllers
 
                 foreach (var item in selectedItems)
                 {
-                    var detail = new OrderDetail
+                    _context.orderDetails.Add(new OrderDetail
                     {
                         OrderId = newOrder.OrderId,
                         ProductId = item.ProductId,
                         Quantity = item.Quantity,
                         UnitPrice = item.Product.Price
-                    };
-
-                    _context.orderDetails.Add(detail);
+                    });
                 }
 
                 _context.cartItems.RemoveRange(selectedItems);
                 await _context.SaveChangesAsync();
 
-                return Ok(newOrder);
+                var createdOrder = await _context.orders
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Product)
+                    .Include(o => o.Payments)
+                    .FirstOrDefaultAsync(o => o.OrderId == newOrder.OrderId);
+
+                return Ok(new { message = "Tạo đơn hàng thành công!", order = createdOrder });
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Lỗi!");
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ex.StackTrace);
-
-                return StatusCode(500, "Lỗi server nội bộ : " + ex.Message);
+                return StatusCode(500, new { message = "Lỗi server nội bộ: " + ex.Message });
             }
         }
 
-        //Admin: Xem tất cả đơn hàng
         [HttpGet("getAll")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllOrders()
         {
             var orders = await _context.orders
-            .Include(o => o.User)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .ToListAsync();
-            return Ok(orders);
+                .Include(o => o.User)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(d => d.Product)
+                .Include(o => o.Payments)
+                .ToListAsync();
+
+            return Ok(new { message = "Lấy tất cả đơn hàng thành công!", orders });
         }
 
-        //User: Xem đơn hàng của chính mình
         [HttpGet("user")]
         [Authorize]
         public async Task<IActionResult> GetUserOrders()
         {
             var userId = GetUserIdFromClaims();
+
             var orders = await _context.orders
-            .Where(o => o.UserId == userId)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .ToListAsync();
-            return Ok(orders);
+                .Where(o => o.UserId == userId)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(d => d.Product)
+                .Include(o => o.Payments)
+                .ToListAsync();
+
+            return Ok(new { message = "Lấy đơn hàng của bạn thành công!", orders });
         }
 
-        //Lấy đơn hàng theo ID
         [HttpGet("{id}")]
         [Authorize]
         public async Task<IActionResult> GetOrderById(int id)
         {
             var order = await _context.orders
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .FirstOrDefaultAsync(o => o.OrderId == id);
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(d => d.Product)
+                .Include(p => p.Payments)
+                .FirstOrDefaultAsync(o => o.OrderId == id);
 
-            if (order == null) return NotFound();
+            if (order == null)
+                return NotFound(new { message = "Không tìm thấy đơn hàng!" });
 
             var userId = GetUserIdFromClaims();
-            var user = await _context.users.FirstOrDefaultAsync(c => c.Id == userId);
+            var user = await _context.users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return Unauthorized(new { message = "Bạn chưa đăng nhập!" });
+
             if (user.Role != "Admin" && order.UserId != userId)
-                return Forbid();
-            return Ok(order);
+                return Forbid("Bạn không có quyền xem đơn hàng này!");
+
+            return Ok(new { message = "Lấy đơn hàng thành công!", order });
         }
 
-        //Admin: Xoá đơn hàng
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteOrder(int id)
         {
             var order = await _context.orders.FindAsync(id);
-            if (order == null) return NotFound();
+            if (order == null)
+                return NotFound(new { message = "Đơn hàng không tồn tại!" });
 
             var orderDetails = _context.orderDetails.Where(d => d.OrderId == id);
             _context.orderDetails.RemoveRange(orderDetails);
             _context.orders.Remove(order);
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { message = "Xoá đơn hàng thành công!" });
         }
     }
 }

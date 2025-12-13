@@ -35,8 +35,13 @@ namespace Controllers
             // Kiểm tra xem Username đã tồn tại chưa
             if (await _context.users.AnyAsync(
                 u => u.Username == request.Username))
-                return BadRequest("Username đã tồn tại.");
-
+                return BadRequest(new { message = "Username đã tồn tại." });
+            if (await _context.users.AnyAsync(
+                u => u.Phone == request.Phone))
+                return BadRequest(new { message = "SDT đã tồn tại." });
+            if (await _context.users.AnyAsync(
+                u => u.Email == request.Email))
+                return BadRequest(new { message = "Email đã tồn tại." });
             var user = new User
             {
                 Username = request.Username,
@@ -45,7 +50,9 @@ namespace Controllers
                 Email = request.Email,
                 Role = "User",
                 Phone = request.Phone,
-                IsActive = true
+                IsActive = true,
+                IsVerified = false,
+                EmailVerificationSentAt = DateTime.UtcNow
             };
 
             _context.users.Add(user);
@@ -71,7 +78,9 @@ namespace Controllers
                 Email = request.Email,
                 Role = "Admin",
                 Phone = request.Phone,
-                IsActive = true
+                IsActive = true,
+                IsVerified = true,
+                EmailVerificationSentAt = DateTime.UtcNow
             };
 
             _context.users.Add(user);
@@ -147,10 +156,40 @@ namespace Controllers
             return Ok("Đổi mật khẩu thành công!");
         }
 
-        public class ChangePasswordRequest
+        [Authorize]
+        [HttpPut("update")]
+        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserRequest request)
         {
-            public string OldPassword { get; set; }
-            public string NewPassword { get; set; }
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized();
+
+            if (!int.TryParse(userIdClaim.Value, out int userId)) return Unauthorized();
+
+            var user = await _context.users.FindAsync(userId);
+            if (user == null) return NotFound("Không tìm thấy người dùng.");
+
+            // Kiểm tra trùng SĐT
+            if (await _context.users.AnyAsync(u => u.Phone == request.Phone && u.Id != userId))
+                return BadRequest("Số điện thoại đã được sử dụng.");
+
+            user.FullName = request.FullName;
+            user.Phone = request.Phone;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Cập nhật thông tin thành công!", user });
         }
+
+    }
+    public class UpdateUserRequest
+    {
+        public string FullName { get; set; }
+        public string Phone { get; set; }
+    }
+
+    public class ChangePasswordRequest
+    {
+        public string OldPassword { get; set; }
+        public string NewPassword { get; set; }
     }
 }

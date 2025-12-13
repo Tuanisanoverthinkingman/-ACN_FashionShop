@@ -1,98 +1,104 @@
-// Đặt file này trong thư mục /Controllers/ScraperController.cs
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims; // Cần để lấy UserId
-using Models; // Namespace chứa Product, Category
-using Microsoft.EntityFrameworkCore; // Cần cho FirstOrDefaultAsync
+using Microsoft.EntityFrameworkCore;
+using Models;
+using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using HtmlAgilityPack;
 
-[Authorize(Roles = "Admin, Supplier")] 
-[ApiController]
-[Route("api/[controller]")]
-public class ScraperController : ControllerBase
+namespace Controllers
 {
-    private readonly YameScraperService _scraperService;
-    private readonly AppDbContext _context;
-    private readonly Random _random = new Random();
-
-    public ScraperController(YameScraperService scraperService, AppDbContext context)
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ScraperController : ControllerBase
     {
-        _scraperService = scraperService;
-        _context = context;
-    }
+        private readonly AppDbContext _context;
+        private readonly HttpClient _httpClient;
 
-    // Endpoint để kích hoạt cào dữ liệu
-    [HttpPost("start-yame-scrape")]
-    public async Task<IActionResult> StartYameScrape()
-    {
-        // === 1. LẤY USER ID TỪ TOKEN (SWAGGER) ===
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdString) || !int.TryParse(userIdString, out int loggedInUserId))
+        public ScraperController(AppDbContext context)
         {
-            return Unauthorized("Không thể xác định ID người dùng.");
+            _context = context;
+            _httpClient = new HttpClient();
+
+            // Thêm header để tránh 403
+            _httpClient.DefaultRequestHeaders.Add("User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            _httpClient.DefaultRequestHeaders.Add("Referer", "https://yame.vn");
         }
 
-        // === 2. CÀO DỮ LIỆU THÔ (Giai đoạn 1 + 2) ===
-        Console.WriteLine($"Bắt đầu cào bởi User: {loggedInUserId}");
-        List<ScrapedProduct> rawProducts = await _scraperService.GetHomepageProductsAsync();
-
-        var detailedProducts = new List<ScrapedProduct>();
-        foreach (var product in rawProducts)
+        [HttpGet("fetch-products")]
+        public async Task<IActionResult> FetchProducts()
         {
-            detailedProducts.Add(await _scraperService.GetProductDetailsAsync(product));
-            // Thêm độ trễ nhỏ để tránh bị block
-            await Task.Delay(TimeSpan.FromMilliseconds(_random.Next(300, 800))); 
-        }
+            string url = "https://yame.vn/products.json";
 
-        // === 3. CHẾ BIẾN (MAP DTO -> MODEL) ===
-        var categoryCache = new Dictionary<string, int>();
-        var newDbProducts = new List<Models.Product>();
-
-        foreach (var scrapedProduct in detailedProducts)
-        {
-            // 3a. Xử lý Category (Tìm hoặc Tạo)
-            int categoryId;
-            if (!categoryCache.TryGetValue(scrapedProduct.SourceSection, out categoryId))
+            try
             {
-                var category = await _context.categories
-                    .FirstOrDefaultAsync(c => c.Name == scrapedProduct.SourceSection);
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, "Failed to fetch data");
 
-                if (category == null)
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
+                var productsArray = json["products"] as JArray;
+
+                if (productsArray == null)
+                    return BadRequest("No products found in JSON");
+
+                foreach (var item in productsArray)
                 {
-                    // Tạo mới nếu chưa có
-                    category = new Models.Category
+                    // Lấy category từ product_type
+                    string categoryName = item["product_type"]?.ToString() ?? "Khác";
+
+                    // Check xem category đã tồn tại chưa
+                    var category = await _context.categories
+                        .FirstOrDefaultAsync(c => c.Name == categoryName);
+
+                    if (category == null)
                     {
-                        Name = scrapedProduct.SourceSection,
-                        Description = scrapedProduct.SourceSection,
-                        UserId = loggedInUserId // Gán UserId của bạn
+                        category = new Category
+                        {
+                            Name = categoryName,
+                            Description = $"{categoryName}"
+                        };
+                        _context.categories.Add(category);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    var firstVariant = item["variants"]?[0];
+                    var firstImage = item["images"]?[0];
+
+                    // Strip HTML description
+                    string html = item["body_html"]?.ToString() ?? "";
+                    var doc = new HtmlDocument();
+                    doc.LoadHtml(html);
+                    string plainDescription = doc.DocumentNode.InnerText;
+
+                    // Cắt description nếu quá dài để tránh lỗi database
+                    if (plainDescription.Length > 4000)
+                        plainDescription = plainDescription.Substring(0, 4000);
+                    Random rnd = new Random();
+                    int stock = rnd.Next(50, 201);
+                    var product = new Product
+                    {
+                        Name = item["title"]?.ToString() ?? "No Name",
+                        Description = plainDescription,
+                        Price = decimal.TryParse(firstVariant?["price"]?.ToString(), out var price) ? price : 0,
+                        Instock = stock,
+                        ImageUrl = firstImage?["src"]?.ToString(),
+                        CategoryId = category.Id
                     };
-                    _context.categories.Add(category);
-                    await _context.SaveChangesAsync(); // Lưu để lấy ID
+
+                    // Check trùng tên để tránh duplicate
+                    if (!_context.products.Any(p => p.Name == product.Name))
+                        _context.products.Add(product);
                 }
-                categoryId = category.Id;
-                categoryCache.Add(category.Name, categoryId);
+
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Categories and Products fetched and saved successfully!" });
             }
-
-            // 3b. Tạo Model Product
-            var dbProduct = new Models.Product
+            catch (Exception ex)
             {
-                Name = scrapedProduct.Name,
-                Description = scrapedProduct.Description,
-                Price = scrapedProduct.SalePrice,    // Lấy giá bán
-                Instock = _random.Next(10, 101), // FAKE Instock theo yêu cầu
-                ImageUrl = scrapedProduct.ImageUrl,
-                CategoryId = categoryId,
-                UserId = loggedInUserId // Gán UserId của bạn
-            };
-            newDbProducts.Add(dbProduct);
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
         }
-
-        // === 4. LƯU VÀO DATABASE ===
-        await _context.products.AddRangeAsync(newDbProducts);
-        int savedCount = await _context.SaveChangesAsync();
-
-        return Ok(new { 
-            Message = $"Hoàn tất! Đã cào và lưu {savedCount} sản phẩm.", 
-            TotalFound = detailedProducts.Count 
-        });
     }
 }

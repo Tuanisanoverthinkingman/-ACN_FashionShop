@@ -2,128 +2,126 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getById } from "@/services/product-services";
-import { createCart } from "@/services/cart-services";
-import { createOrder } from "@/services/order-services";
+import { getById, getByCategoryId, Product } from "@/services/product-services";
+import { addToCart } from "@/services/cart-services";
 import { toast } from "react-toastify";
+import { FaShoppingCart } from "react-icons/fa";
+import Feedback from "@/components/FeedBack";
 
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  instock: number;
-  imageUrl: string;
-  categoryId: number;
-}
-
-export default function ProductPage() {
+export default function ProductPage({ currentUserId, isAdmin }: { currentUserId: number; isAdmin?: boolean }) {
   const { id } = useParams();
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
+      if (!id) return;
       try {
-        if (!id) return;
         const data = await getById(Number(id));
-        setProduct(data);
-      } catch (err) {
-        console.error(err);
+        setProduct(data || null);
+
+        if (data?.categoryId) {
+          const relatedProducts = await getByCategoryId(data.categoryId);
+          setRelated(relatedProducts?.filter(p => p.id !== data.id) || []);
+        }
+      } catch {
         toast.error("Không tải được thông tin sản phẩm 😢");
       } finally {
         setLoading(false);
       }
     };
-
     fetchProduct();
   }, [id]);
 
   const handleAddToCart = async () => {
     if (!product) return;
+    setAdding(true);
     try {
-      await createCart({ productId: product.id, quantity: 1 });
+      await addToCart({ productId: product.id, quantity: 1 });
       toast.success("Đã thêm vào giỏ hàng 🎉");
-
-      // thông báo cho Navbar cập nhật giỏ hàng
       window.dispatchEvent(new Event("cartChanged"));
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Thêm vào giỏ hàng thất bại 😢");
+      toast.error("Thêm vào giỏ hàng thất bại 😢");
+    } finally {
+      setAdding(false);
     }
   };
 
-  const handleBuyNow = async () => {
-    if (!product) return;
-    try {
-      // thêm vào giỏ hàng trước
-      const cartItem = await createCart({ productId: product.id, quantity: 1 });
-
-      // tạo order từ cartItem vừa thêm
-      const order = await createOrder([cartItem.id]);
-
-      toast.success("Tạo đơn hàng thành công 🎉");
-
-      // thông báo cho Navbar cập nhật giỏ hàng
-      window.dispatchEvent(new Event("cartChanged"));
-
-      // chuyển đến checkout
-      router.push(`/checkout/${order.id}`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Tạo đơn hàng thất bại 😢");
-    }
-  };
-
-  if (loading) {
-    return <p className="text-center mt-10">Đang tải sản phẩm...</p>;
-  }
-
-  if (!product) {
-    return <p className="text-center mt-10 text-red-500">Sản phẩm không tồn tại 😢</p>;
-  }
+  if (loading) return <p className="text-center mt-10">Đang tải sản phẩm...</p>;
+  if (!product) return <p className="text-center mt-10 text-red-500">Sản phẩm không tồn tại 😢</p>;
 
   return (
-    <div className="bg-gray-800 pt-20 font-['Poppins']">
-      <div className="max-w-5xl mx-auto py-10 px-4">
-        <div className="text-white rounded-xl shadow-lg">
-          <div className="flex flex-col md:flex-row gap-8">
-            {/* Hình ảnh sản phẩm */}
-            <div className="flex-1 p-4">
-              <img
-                src={product.imageUrl}
-                alt={product.name}
-                className="w-full rounded-2xl border border-gray-600"
-              />
-            </div>
+    <div className="bg-gray-100 pt-20 font-['Poppins'] min-h-screen">
+      <div className="max-w-6xl mx-auto py-10 px-4">
+        {/* Main product */}
+        <div className="bg-white rounded-xl shadow-md p-6 flex flex-col md:flex-row gap-8">
+          {/* Hình ảnh */}
+          <div className="flex-1 flex justify-center items-center">
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-full max-w-sm rounded-2xl border border-gray-200 object-cover shadow-sm"
+            />
+          </div>
 
-            {/* Thông tin sản phẩm */}
-            <div className="flex-1 flex flex-col gap-4 p-4">
-              <h1 className="text-3xl font-bold">{product.name}</h1>
-              <p className="text-xl text-purple-400 font-semibold">
-                {product.price.toLocaleString()} ₫
-              </p>
-              <p className="text-gray-300">{product.description}</p>
-              <p className="text-gray-400">Còn lại: {product.instock}</p>
+          {/* Thông tin sản phẩm */}
+          <div className="flex-1 flex flex-col gap-4">
+            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+            <p className="text-3xl text-blue-400 font-extrabold">
+              {product.price.toLocaleString()} ₫
+            </p>
+            <p className="text-gray-600 max-h-36 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              {product.description}
+            </p>
+            <p className="text-gray-500 font-medium">Còn lại: {product.instock}</p>
 
-              {/* Nút hành động */}
-              <div className="flex gap-4 mt-4">
-                <button
-                  onClick={handleAddToCart}
-                  className="flex-1 bg-black text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
+            <button
+              onClick={handleAddToCart}
+              className="w-full flex rounded-lg overflow-hidden border border-gray-300 hover:shadow-md transition"
+            >
+              <span className="flex-[3] bg-white px-4 py-2 text-black font-semibold text-center">
+                Thêm vào giỏ hàng
+              </span>
+              <span className="flex-[1] bg-blue-400 text-white flex items-center justify-center">
+                <FaShoppingCart />
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Sản phẩm liên quan */}
+        {related.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Sản phẩm liên quan</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+              {related.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-lg shadow-sm hover:shadow-lg transition cursor-pointer overflow-hidden"
+                  onClick={() => router.push(`/product/${item.id}`)}
                 >
-                  Thêm vào giỏ hàng 🛒
-                </button>
-                <button
-                  onClick={handleBuyNow}
-                  className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition"
-                >
-                  Mua ngay 💳
-                </button>
-              </div>
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-40 object-cover"
+                  />
+                  <div className="p-3">
+                    <h3 className="font-medium text-gray-900 truncate">{item.name}</h3>
+                    <p className="text-blue-400 font-bold mt-1">{item.price.toLocaleString()} ₫</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        )}
+
+        {/* Feedback */}
+        <div className="mt-12">
+          <Feedback productId={product.id} currentUserId={currentUserId} isAdmin={isAdmin} />
         </div>
       </div>
     </div>

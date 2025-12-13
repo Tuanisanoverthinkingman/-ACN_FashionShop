@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { createUser } from "@/services/user-services";
+import { sendVerificationEmail } from "@/services/emailAndOTPServices";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,6 +18,8 @@ export default function RegisterPage() {
     phone: "",
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -24,15 +28,14 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (form.password !== form.confirmPassword) {
-      toast.error("Mật khẩu không khớp!");
-      return;
-    }
-
-    if (!form.fullName || !form.phone) {
-      toast.error("Vui lòng điền đầy đủ họ tên và số điện thoại!");
-      return;
-    }
+    // Kiểm tra từng input và hiển thị toast tiếng Việt nếu thiếu
+    if (!form.username) return toast.error("Vui lòng nhập tài khoản!");
+    if (!form.fullName) return toast.error("Vui lòng nhập họ và tên!");
+    if (!form.email) return toast.error("Vui lòng nhập email!");
+    if (!form.phone) return toast.error("Vui lòng nhập số điện thoại!");
+    if (!form.password) return toast.error("Vui lòng nhập mật khẩu!");
+    if (!form.confirmPassword) return toast.error("Vui lòng nhập lại mật khẩu!");
+    if (form.password !== form.confirmPassword) return toast.error("Mật khẩu không khớp!");
 
     try {
       setLoading(true);
@@ -43,13 +46,15 @@ export default function RegisterPage() {
         fullName: form.fullName,
         phone: form.phone,
       });
-
+      try {
+        await sendVerificationEmail(form.email);
+      }
+      catch (err: any){
+        toast.error(err.response?.data?.message || "Gửi email thất bại!");
+      }
       toast.success("Đăng ký thành công 🎉");
-
-      // redirect về HomePage và bật popup login
-      router.push("/?login=true");
+      router.push("/login");
     } catch (err: any) {
-      console.error(err);
       toast.error(err.response?.data?.message || "Đăng ký thất bại 😢");
     } finally {
       setLoading(false);
@@ -57,9 +62,9 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 font-['Poppins']">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-semibold text-center mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-200 font-['Poppins'] py-24 px-4">
+      <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl">
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Tạo tài khoản mới
         </h2>
 
@@ -67,11 +72,10 @@ export default function RegisterPage() {
           <input
             type="text"
             name="username"
-            placeholder="Tên người dùng"
+            placeholder="Tên đăng nhập"
             value={form.username}
             onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
+            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
           <input
             type="text"
@@ -79,8 +83,7 @@ export default function RegisterPage() {
             placeholder="Họ và tên"
             value={form.fullName}
             onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
+            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
           <input
             type="email"
@@ -88,8 +91,7 @@ export default function RegisterPage() {
             placeholder="Email"
             value={form.email}
             onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
+            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
           <input
             type="text"
@@ -97,45 +99,62 @@ export default function RegisterPage() {
             placeholder="Số điện thoại"
             value={form.phone}
             onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
+            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
-          <input
-            type="password"
-            name="password"
-            placeholder="Mật khẩu"
-            value={form.password}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
-          />
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Nhập lại mật khẩu"
-            value={form.confirmPassword}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
-            required
-          />
+
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Mật khẩu"
+              value={form.password}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              name="confirmPassword"
+              placeholder="Nhập lại mật khẩu"
+              value={form.confirmPassword}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition"
+            >
+              {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-3 rounded-lg hover:opacity-90 transition"
+            className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition font-semibold"
           >
             {loading ? "Đang xử lý..." : "Đăng ký"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-4">
+        <p className="text-center text-gray-500 text-sm mt-4">
           Đã có tài khoản?{" "}
-          <button
-            onClick={() => router.push("/?login=true")}
-            className="text-black font-medium hover:underline"
+          <span
+            onClick={() => router.push("/login")}
+            className="text-blue-500 hover:underline cursor-pointer"
           >
             Đăng nhập ngay
-          </button>
+          </span>
         </p>
       </div>
     </div>

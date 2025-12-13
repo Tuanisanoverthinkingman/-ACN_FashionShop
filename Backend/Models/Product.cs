@@ -15,8 +15,7 @@ namespace Models
         [Column(TypeName = "nvarchar(255)")]
         public string Name { get; set; }
 
-        [StringLength(255)]
-        [Column(TypeName = "nvarchar(255)")]
+        [Column(TypeName = "nvarchar(max)")]
         public string Description { get; set; }
 
         [Required]
@@ -35,12 +34,10 @@ namespace Models
         public int CategoryId { get; set; }
         public Category? Category { get; set; }
 
-        [Required]
-        [ForeignKey("User")]
-        public int UserId { get; set; }
-        public User? User { get; set; }
-
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
+
+        public ICollection<PromotionProduct> PromotionProducts { get; set; }
+        public ICollection<Feedback> Feedbacks { get; set; }
     }
 }

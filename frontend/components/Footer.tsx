@@ -2,6 +2,18 @@
 
 import Link from "next/link";
 import { Facebook, Instagram, Twitter } from "lucide-react";
+import { useEffect, useState } from "react";
+
+// Component chỉ render năm trên client
+function FooterYear() {
+  const [year, setYear] = useState<number>(0);
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
+  return <span>{year}</span>;
+}
 
 export default function Footer() {
   return (
@@ -13,12 +25,7 @@ export default function Footer() {
           <ul className="space-y-3">
             {["Women", "Men", "Shoes", "Watches"].map((item) => (
               <li key={item}>
-                <Link
-                  href="#"
-                  className="text-gray-400 hover:text-white transition-colors duration-300"
-                >
-                  {item}
-                </Link>
+                <Link href="#" className="text-gray-400 hover:text-white transition-colors duration-300">{item}</Link>
               </li>
             ))}
           </ul>
@@ -30,12 +37,7 @@ export default function Footer() {
           <ul className="space-y-3">
             {["Track Order", "Returns", "Shipping", "FAQs"].map((item) => (
               <li key={item}>
-                <Link
-                  href="#"
-                  className="text-gray-400 hover:text-white transition-colors duration-300"
-                >
-                  {item}
-                </Link>
+                <Link href="#" className="text-gray-400 hover:text-white transition-colors duration-300">{item}</Link>
               </li>
             ))}
           </ul>
@@ -48,24 +50,9 @@ export default function Footer() {
             Any questions? Let us know in store at Bac Tu Liem, Ha Noi
           </p>
           <div className="flex space-x-4">
-            <Link
-              href="#"
-              className="hover:text-white transition-colors duration-300"
-            >
-              <Facebook size={20} />
-            </Link>
-            <Link
-              href="#"
-              className="hover:text-white transition-colors duration-300"
-            >
-              <Instagram size={20} />
-            </Link>
-            <Link
-              href="#"
-              className="hover:text-white transition-colors duration-300"
-            >
-              <Twitter size={20} />
-            </Link>
+            <Link href="#" className="hover:text-white transition-colors duration-300"><Facebook size={20} /></Link>
+            <Link href="#" className="hover:text-white transition-colors duration-300"><Instagram size={20} /></Link>
+            <Link href="#" className="hover:text-white transition-colors duration-300"><Twitter size={20} /></Link>
           </div>
         </div>
 
@@ -91,8 +78,8 @@ export default function Footer() {
       {/* Divider */}
       <div className="border-t border-gray-700 mt-10 pt-8 text-center text-sm text-gray-500">
         <p>
-          Copyright © {new Date().getFullYear()} All rights reserved | Made with{" "}
-          <span className="text-red-500">♥</span> by{" "}
+          Copyright © <FooterYear /> All rights reserved | Made with{" "}
+          <span className="text-red-500">♥</span> by ...
         </p>
       </div>
     </footer>

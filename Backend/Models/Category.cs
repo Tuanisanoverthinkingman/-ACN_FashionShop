@@ -20,12 +20,9 @@ namespace Models
         [Column(TypeName = "nvarchar(255)")]
         public string? Description { get; set; }
 
-        [Required]
-        [ForeignKey("User")]
-        public int UserId { get; set; }
-        public User? User { get; set; }
-
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
+
+        public ICollection<PromotionCategory> PromotionCategories { get; set; }
     }
 }

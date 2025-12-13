@@ -29,12 +29,34 @@ public class AuthController : Controller
         var user = await _context.users.FirstOrDefaultAsync(u => u.Username == request.Username);
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
-            return Unauthorized();
+            return Unauthorized(new { message = "Sai tài khoản hoặc mật khẩu" });
 
-        //Tạo token cho phiên đăng nhập
+        // Nếu đã gửi email nhưng hết hạn 24h
+        if (!user.IsVerified &&
+            user.EmailVerificationSentAt.HasValue &&
+            user.EmailVerificationSentAt.Value.AddHours(24) < DateTime.UtcNow)
+        {
+            user.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return BadRequest(new
+            {
+                message = "Email chưa xác thực và đã hết hạn sau 24h. Vui lòng nhấn 'Gửi lại email xác thực'."
+            });
+        }
+
+        // Nếu email đã xác thực nhưng tài khoản bị khóa (do admin)
+        if (!user.IsActive)
+        {
+            return BadRequest(new
+            {
+                message = "Tài khoản của bạn đang bị vô hiệu hóa. Vui lòng liên hệ quản trị viên."
+            });
+        }
+
+        // Tạo JWT token
         var token = GeneratedJwtToken(user);
 
-        //Trả về thông tin người dùng và token
         return Ok(new
         {
             Token = token,
@@ -85,7 +107,7 @@ public class AuthController : Controller
     [Authorize]
     public IActionResult DebugClaims()
     {
-        var claims = User.Claims.Select(c => new 
+        var claims = User.Claims.Select(c => new
         {
             Type = c.Type,
             Value = c.Value

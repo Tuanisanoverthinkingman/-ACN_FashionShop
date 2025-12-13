@@ -17,7 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 
-// Thêm Controller + cấu hình JSON để bỏ qua vòng lặp tham chiếu
+// Thêm Controller
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -53,6 +53,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
 builder.Services.AddAuthorization();
 
 // Thêm Swagger service
@@ -91,9 +93,9 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+    
 });
 
-builder.Services.AddScoped<YameScraperService>();
 
 var app = builder.Build();
 
@@ -101,9 +103,14 @@ app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();          // Sinh file JSON mô tả API
-    app.UseSwaggerUI();        // Tạo giao diện web để test API
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Ecommerce API v1");
+        c.RoutePrefix = string.Empty;
+    });
 }
+
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();

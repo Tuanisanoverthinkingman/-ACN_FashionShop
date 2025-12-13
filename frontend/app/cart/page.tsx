@@ -1,32 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCart, updateQuantity, deleteCart } from "@/services/cart-services";
-import LoginModal from "@/components/LoginModal";
+import { getCart, updateCartQuantity, deleteFromCart } from "@/services/cart-services";
+import { createOrder } from "@/services/order-services";
 import { useRouter } from "next/navigation";
-import { div } from "framer-motion/client";
+import { toast } from "react-toastify";
+
+interface CartProduct {
+  id: number;
+  name: string;
+  imageUrl: string;
+  price: number;
+}
 
 interface CartItem {
-  productId: number;
+  cartItemId: number;
   quantity: number;
-  product?: {
-    id: number;
-    name: string;
-    imageUrl: string;
-    price: number;
-  };
+  product?: CartProduct;
 }
 
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showLogin, setShowLogin] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const router = useRouter();
 
   const fetchCart = async () => {
     try {
       const data = await getCart();
-      setCartItems(data);
+      const mappedData = data.map((item: any) => ({
+        cartItemId: item.cartItemId,
+        quantity: item.quantity,
+        product: item.product
+          ? {
+              id: item.product.id,
+              name: item.product.name,
+              imageUrl: item.product.imageUrl,
+              price: item.product.price,
+            }
+          : undefined,
+      }));
+      setCartItems(mappedData);
     } catch (err) {
       console.error("Lỗi khi tải giỏ hàng:", err);
     } finally {
@@ -37,102 +52,145 @@ export default function CartPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setShowLogin(true);
       setLoading(false);
       return;
     }
     fetchCart();
   }, []);
 
-  useEffect(() => {
-    const handleUserChanged = () => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        setShowLogin(false);
-        setLoading(true);
-        fetchCart();
-      }
-    };
-    window.addEventListener("userChanged", handleUserChanged);
-    return () => window.removeEventListener("userChanged", handleUserChanged);
-  }, []);
-
-  const handleQuantityChange = async (productId: number, newQuantity: number) => {
+  const handleQuantityChange = async (cartItemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
-    await updateQuantity({ productId, quantity: newQuantity });
-    fetchCart();
-    window.dispatchEvent(new Event("cartChanged")); // update navbar
+    try {
+      await updateCartQuantity({ cartItemId: cartItemId, quantity: newQuantity });
+      fetchCart();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleDelete = async (productId: number) => {
-    await deleteCart(productId);
-    fetchCart();
-    window.dispatchEvent(new Event("cartChanged")); // update navbar
+  const handleDelete = async (cartItemId: number) => {
+    try {
+      await deleteFromCart(cartItemId);
+      fetchCart();
+      setSelectedItems((prev) => prev.filter((id) => id !== cartItemId));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const totalPrice = cartItems.reduce(
-    (sum, item) => sum + ((item.product?.price || 0) * item.quantity),
-    0
-  );
+  const handleSelectItem = (cartItemId: number, checked: boolean) => {
+    setSelectedItems((prev) => {
+      if (checked) return [...prev, cartItemId];
+      return prev.filter((id) => id !== cartItemId);
+    });
+  };
 
-  if (showLogin) return <LoginModal onClose={() => setShowLogin(false)} />;
-  if (loading)
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked) {
+      setSelectedItems(cartItems.map((item) => item.cartItemId));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (selectedItems.length === 0) {
+      alert("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán!");
+      return;
+    }
+
+    try {
+      const order = await createOrder(selectedItems);
+      toast.success("Tạo đơn hàng thành công!");
+      setSelectedItems([]);
+      setSelectAll(false);
+      fetchCart();
+      router.push(`/checkout/${order.orderId}`);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || "Thanh toán thất bại, vui lòng thử lại!");
+    }
+  };
+
+  const totalPrice = cartItems
+    .filter((item) => selectedItems.includes(item.cartItemId))
+    .reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0);
+
+  if (loading) return <div className="pt-[90px] text-center mt-10">Đang tải giỏ hàng...</div>;
+  if (cartItems.length === 0)
+    return <div className="pt-[90px] text-center mt-10">Giỏ hàng trống 😢</div>;
+
   return (
-    <div>
-      <p className="pt-[90px] text-center mt-10">Đang tải giỏ hàng...</p>
-      <button
-        onClick={() => router.push("/")}
-      >Thêm sản phẩm</button>
-    </div>
-  );
-  if (cartItems.length === 0) 
-  return (
-    <div>
-      <p className="pt-[90px] text-center mt-10">Giỏ hàng trống 😢</p>
-      <button
-        onClick={() => router.push("/")}
-      >Thêm sản phẩm</button>
-    </div>
-  );
-  return (
-    <div className="pt-[90px] bg-gray-500 max-w-7xl mx-auto px-4 py-8 min-h-screen">
-      <div className="px-2 py-1 flex justify-between items-center mb-6 rounded border border-white">
-        <h1 className="text-3xl text-white font-bold">Giỏ hàng của bạn 🛒</h1>
-        <button
-          onClick={() => router.push("/")}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-        >
-          Thêm sản phẩm vào giỏ +
-        </button>
+    <div className="pt-[90px] bg-white max-w-7xl mx-auto px-6 py-8 min-h-screen">
+      <div className="px-4 py-2 flex justify-between items-center mb-6 rounded border border-gray-200 bg-gray-50">
+        <h1 className="text-3xl text-gray-800 font-bold">Giỏ hàng của bạn 🛒</h1>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="checkbox"
+          checked={selectAll}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="w-5 h-5 cursor-pointer"
+        />
+        <label className="text-gray-700 font-medium">Chọn tất cả</label>
       </div>
 
       <div className="flex flex-col gap-4">
-        {cartItems.map(item => (
-          <div key={item.productId} className="flex items-center gap-4 p-4 border border-white rounded-lg shadow-sm hover:shadow-md transition">
+        {cartItems.map((item) => (
+          <div
+            key={item.cartItemId}
+            className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition bg-gray-50"
+          >
+            <input
+              type="checkbox"
+              checked={selectedItems.includes(item.cartItemId)}
+              onChange={(e) => handleSelectItem(item.cartItemId, e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
             <img
               src={item.product?.imageUrl || "/images/default.jpg"}
               alt={item.product?.name || "Sản phẩm"}
               className="w-24 h-24 object-cover rounded"
             />
             <div className="flex-1">
-              <h2 className="font-semibold text-white">{item.product?.name}</h2>
-              <p className="text-white">{(item.product?.price || 0).toLocaleString()} VNĐ</p>
+              <h2 className="font-semibold text-gray-800">{item.product?.name}</h2>
+              <p className="text-gray-700">{(item.product?.price || 0).toLocaleString()} VNĐ</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => handleQuantityChange(item.productId, item.quantity - 1)} className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">-</button>
-              <span className="text-white">{item.quantity}</span>
-              <button onClick={() => handleQuantityChange(item.productId, item.quantity + 1)} className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">+</button>
+              <button
+                onClick={() => handleQuantityChange(item.cartItemId, item.quantity - 1)}
+                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition"
+              >
+                -
+              </button>
+              <span className="text-gray-800">{item.quantity}</span>
+              <button
+                onClick={() => handleQuantityChange(item.cartItemId, item.quantity + 1)}
+                className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition"
+              >
+                +
+              </button>
             </div>
-            <button onClick={() => handleDelete(item.productId)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">
+            <button
+              onClick={() => handleDelete(item.cartItemId)}
+              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+            >
               Xóa
             </button>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex justify-between items-center p-4 border-t">
-        <span className="font-bold text-lg text-white">Tổng tiền: {totalPrice.toLocaleString()} VNĐ</span>
-        <button className="px-6 py-2 bg-green-500 text-white font-semibold rounded hover:bg-green-600 transition">
+      <div className="mt-6 flex justify-between items-center p-4 border-t bg-gray-50">
+        <span className="font-bold text-lg text-gray-800">
+          Tổng tiền: {totalPrice.toLocaleString()} VNĐ
+        </span>
+        <button
+          onClick={handleCheckout}
+          className="px-6 py-2 bg-green-500 text-white font-semibold rounded hover:bg-green-600 transition"
+        >
           Thanh toán
         </button>
       </div>

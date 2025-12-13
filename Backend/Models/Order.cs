@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Models
 {
+
     [Table("orders")]
 
     public class Order
@@ -21,6 +22,9 @@ namespace Models
 
         [Required]
         public decimal TotalAmount { get; set; }
+
+        public string OrderStatus { get; set; }
+        public List<Payment> Payments { get; set; } = new();
 
         public List<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 

@@ -27,7 +27,7 @@ namespace Models
 
         [Required]
         [Column(TypeName = "varchar(30)")]
-        public string Role { get; set; } // Admin, Người dùng
+        public string Role { get; set; }
 
         [Required]
         [Column(TypeName = "varchar(100)")]
@@ -42,5 +42,11 @@ namespace Models
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
 
         public bool IsActive { get; set; } = true;
+
+        public bool IsVerified { get; set; } = false;
+        public DateTime? EmailVerificationSentAt { get; set; }
+        public ICollection<Promotion> Promotions { get; set; }
+        public ICollection<UserPromotion> UserPromotions { get; set; }
+        public ICollection<Feedback> Feedbacks { get; set; }
     }
 }

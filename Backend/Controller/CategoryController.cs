@@ -25,13 +25,10 @@ namespace Controllers
         {
             try
             {
-                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-
                 var category = new Category
                 {
                     Name = request.Name,
                     Description = request.Description,
-                    UserId = userId
                 };
                 _context.categories.Add(category);
                 await _context.SaveChangesAsync();
