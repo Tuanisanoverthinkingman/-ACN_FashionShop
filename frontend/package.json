@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "antd": "^6.1.0",
     "axios": "^1.13.2",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.552.0",

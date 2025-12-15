@@ -28,7 +28,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Kiểm tra từng input và hiển thị toast tiếng Việt nếu thiếu
+    // Kiểm tra input
     if (!form.username) return toast.error("Vui lòng nhập tài khoản!");
     if (!form.fullName) return toast.error("Vui lòng nhập họ và tên!");
     if (!form.email) return toast.error("Vui lòng nhập email!");
@@ -37,8 +37,9 @@ export default function RegisterPage() {
     if (!form.confirmPassword) return toast.error("Vui lòng nhập lại mật khẩu!");
     if (form.password !== form.confirmPassword) return toast.error("Mật khẩu không khớp!");
 
+    setLoading(true);
     try {
-      setLoading(true);
+      // Gọi API tạo user
       await createUser({
         username: form.username,
         email: form.email,
@@ -46,16 +47,21 @@ export default function RegisterPage() {
         fullName: form.fullName,
         phone: form.phone,
       });
+
       try {
         await sendVerificationEmail(form.email);
+        toast.success("Đăng ký thành công 🎉. Vui lòng kiểm tra email để xác thực!");
+        router.push("/login");
+      } catch (emailErr: any) {
+        toast.error(emailErr.response?.data?.message || "Gửi email thất bại!");
       }
-      catch (err: any){
-        toast.error(err.response?.data?.message || "Gửi email thất bại!");
-      }
-      toast.success("Đăng ký thành công 🎉");
-      router.push("/login");
+
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Đăng ký thất bại 😢");
+      const errorMessage =
+        err.response?.data?.message ||
+        JSON.stringify(err.response?.data) ||
+        "Đăng ký thất bại 😢";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

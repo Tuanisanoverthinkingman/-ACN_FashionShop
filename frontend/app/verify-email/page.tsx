@@ -1,87 +1,57 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "react-toastify";
-import { sendVerificationEmail } from "@/services/emailAndOTPServices";
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { verifyEmailToken } from "@/services/emailAndOTPServices";
 
 export default function VerifyEmailPage() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [message, setMessage] = useState("");
 
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+  useEffect(() => {
+    const email = searchParams.get("email");
+    const token = searchParams.get("token");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email.trim()) {
-      toast.error("Vui lòng nhập email!");
+    if (!email || !token) {
+      setStatus("error");
+      setMessage("Link xác thực không hợp lệ ❌");
       return;
     }
 
-    if (!isValidEmail(email.trim())) {
-      toast.error("Email không đúng định dạng!");
-      return;
-    }
+    // gọi API xác thực token
+    verifyEmailToken(email, token)
+      .then((res) => {
+        setStatus("success");
+        setMessage(res.message || "Xác thực tài khoản thành công 🎉");
 
-    setLoading(true);
-    try {
-      await sendVerificationEmail(email.trim());
-      toast.success("Email xác thực đã được gửi 📧");
-      router.push("/login");
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        toast.error("Email chưa đăng ký, chuyển sang đăng ký");
-        router.push("/register");
-      } else {
-        toast.error(err.response?.data?.message || "Có lỗi xảy ra");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+        // tự động chuyển hướng sau 3 giây
+        setTimeout(() => router.push("/login"), 3000);
+      })
+      .catch((err) => {
+        setStatus("error");
+        setMessage(err.response?.data || "Xác thực thất bại ❌");
+      });
+  }, [searchParams, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 font-['Poppins']">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          Gửi lại email xác thực
-        </h2>
-
-        <form onSubmit={handleSubmit} noValidate  className="space-y-5">
-          <div>
-            <label className="block mb-1 font-medium text-gray-700">
-              Email đăng ký
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Nhập email..."
-              className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition font-semibold disabled:opacity-50"
-          >
-            {loading ? "Đang gửi..." : "Gửi email xác thực"}
-          </button>
-        </form>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => router.push("/login")}
-            className="text-sm text-blue-500 hover:underline"
-          >
-            Quay lại đăng nhập
-          </button>
-        </div>
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+        {status === "loading" && <p>Đang xác thực email... ⏳</p>}
+        {(status === "success" || status === "error") && (
+          <>
+            <p className={`font-semibold ${status === "success" ? "text-green-600" : "text-red-600"}`}>
+              {message}
+            </p>
+            <button
+              onClick={() => router.push("/login")}
+              className="mt-4 text-blue-500 hover:underline"
+            >
+              Quay lại đăng nhập
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

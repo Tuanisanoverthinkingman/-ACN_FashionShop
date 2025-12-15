@@ -23,7 +23,7 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] PromotionRequest request)
         {
-            if (_context.promotions.Any(p => p.Code == request.Code))
+            if (request.ApplyType != PromotionApplyType.General && _context.promotions.Any(p => p.Code == request.Code))
             {
                 return BadRequest(new { message = "Code promotion đã tồn tại" });
             }
@@ -36,6 +36,52 @@ namespace Controllers
             if (validateResult != null)
                 return validateResult;
 
+            // --- Check nếu ApplyType là Product hoặc Category, tránh trùng sản phẩm/danh mục ---
+            if (request.ApplyType == PromotionApplyType.Product)
+            {
+                var existingPromo = await _context.promotions
+                    .Include(p => p.PromotionProducts)
+                    .FirstOrDefaultAsync(p => p.ApplyType == PromotionApplyType.Product &&
+                                              p.PromotionProducts.Any(pp => request.ProductIds.Contains(pp.ProductId)));
+
+                if (existingPromo != null)
+                {
+                    // Cập nhật promotion hiện có
+                    existingPromo.DiscountPercent = request.DiscountPercent;
+                    existingPromo.Description = request.Description;
+                    existingPromo.StartDate = request.StartDate;
+                    existingPromo.EndDate = request.EndDate;
+
+                    existingPromo.PromotionProducts.Clear();
+                    AttachMappings(existingPromo, request);
+
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "Cập nhật promotion do sản phẩm đã có promotion Product khác" });
+                }
+            }
+            else if (request.ApplyType == PromotionApplyType.Category)
+            {
+                var existingPromo = await _context.promotions
+                    .Include(p => p.PromotionCategories)
+                    .FirstOrDefaultAsync(p => p.ApplyType == PromotionApplyType.Category &&
+                                              p.PromotionCategories.Any(pc => request.CategoryIds.Contains(pc.CategoryId)));
+
+                if (existingPromo != null)
+                {
+                    existingPromo.DiscountPercent = request.DiscountPercent;
+                    existingPromo.Description = request.Description;
+                    existingPromo.StartDate = request.StartDate;
+                    existingPromo.EndDate = request.EndDate;
+
+                    existingPromo.PromotionCategories.Clear();
+                    AttachMappings(existingPromo, request);
+
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "Cập nhật promotion do danh mục đã có promotion Category khác" });
+                }
+            }
+
+            // --- Nếu không trùng, tạo mới promotion ---
             var promo = new Promotion
             {
                 Code = request.Code,

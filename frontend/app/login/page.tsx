@@ -23,7 +23,13 @@ export default function LoginPage() {
 
         try {
             const { token, user } = await login(username, password);
-            router.push("/");
+
+            // Redirect theo role
+            if (user.role === "Admin") {
+                router.push("/admin");
+            } else {
+                router.push("/"); 
+            }
         } catch (err: any) {
             toast.error(err.message || "Đăng nhập thất bại 😢");
         } finally {
@@ -90,7 +96,7 @@ export default function LoginPage() {
                 <div className="mt-4 text-center">
                     <button
                         type="button"
-                        onClick={() => router.push("/verify-email")}
+                        onClick={() => router.push("/send-verify-email")}
                         className="text-sm text-blue-500 hover:underline transition font-medium"
                     >
                         Gửi lại email xác thực

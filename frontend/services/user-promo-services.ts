@@ -130,5 +130,6 @@ export const getGeneralPromotions = async (): Promise<UserPromotion[]> => {
     return res.data;
   } catch {
     return [];
+    
   }
 };

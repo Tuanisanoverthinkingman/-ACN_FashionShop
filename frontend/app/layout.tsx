@@ -1,19 +1,19 @@
+"use client";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { usePathname } from "next/navigation";
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const showNavBar = !pathname.startsWith("/admin");
+
   return (
     <html lang="en">
       <body className="relative">
-        <NavBar />
+        {showNavBar && <NavBar />}
         {children}
-        {/* Toast container hiển thị toast */}
         <ToastContainer
           position="top-right"
           autoClose={3000}

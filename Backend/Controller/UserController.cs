@@ -119,7 +119,7 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<User>>> GetAllUser()
         {
-            var users = await _context.users.ToListAsync();
+            var users = await _context.users.Where(u => u.Role != "Admin").ToListAsync();
             return Ok(users);
         }
 
@@ -180,6 +180,20 @@ namespace Controllers
             return Ok(new { message = "Cập nhật thông tin thành công!", user });
         }
 
+        // Toggle trạng thái isActive của user (tạm xóa)
+        [HttpPut("{id}/toggle-active")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleUserActive(int id)
+        {
+            var user = await _context.users.FindAsync(id);
+            if (user == null) return NotFound("Không tìm thấy người dùng.");
+
+            user.IsActive = !user.IsActive;
+            await _context.SaveChangesAsync();
+
+            string status = user.IsActive ? "kích hoạt" : "tạm xóa";
+            return Ok(new { message = $"Đã {status} tài khoản người dùng.", isActive = user.IsActive });
+        }
     }
     public class UpdateUserRequest
     {
