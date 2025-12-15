@@ -46,19 +46,34 @@ namespace Controllers
                 existingCart.Quantity += request.Quantity;
                 _context.cartItems.Update(existingCart);
             }
+
+            CartItem cartItem;
+
+            if (existingCart != null)
+            {
+                existingCart.Quantity += request.Quantity;
+                _context.cartItems.Update(existingCart);
+                cartItem = existingCart;
+            }
             else
             {
-                _context.cartItems.Add(new CartItem
+                cartItem = new CartItem
                 {
                     UserId = (int)userId,
                     ProductId = request.ProductId,
                     Quantity = request.Quantity,
                     CreateAt = DateTime.UtcNow
-                });
+                };
+                _context.cartItems.Add(cartItem);
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Thêm hàng vào giỏ hàng thành công." });
+
+            return Ok(new
+            {
+                message = "Thêm hàng vào giỏ hàng thành công.",
+                cartItemId = cartItem.CartItemId
+            });
         }
 
         // Cập nhật số lượng
@@ -105,6 +120,7 @@ namespace Controllers
             var cartItems = await _context.cartItems
                 .Where(c => c.UserId == userId)
                 .Include(c => c.Product)
+                    .ThenInclude(p => p.Category)
                 .ToListAsync();
 
             // Trả về dữ liệu gọn cho frontend
@@ -118,7 +134,8 @@ namespace Controllers
                     id = c.Product.Id,
                     name = c.Product.Name,
                     imageUrl = c.Product.ImageUrl,
-                    price = c.Product.Price
+                    price = c.Product.Price,
+                    categoryId = c.Product.CategoryId
                 }
             });
 

@@ -6,7 +6,7 @@ namespace Models
     public enum PromotionStatus
     {
         Active,
-        Expried
+        Expired
     }
     [Table("Promotions")]
     public class Promotion
@@ -19,7 +19,7 @@ namespace Models
 
         [Required]
         public double DiscountPercent { get; set; }
-        
+
         [Required]
         public PromotionApplyType ApplyType { get; set; }
 
@@ -33,11 +33,18 @@ namespace Models
 
         [Required]
         public PromotionStatus Status { get; set; }
+
         [Required]
         public DateTime CreatedAt { get; set; }
 
         public ICollection<UserPromotion> UserPromotions { get; set; }
+            = new List<UserPromotion>();
+
         public ICollection<PromotionCategory> PromotionCategories { get; set; }
+            = new List<PromotionCategory>();
+
         public ICollection<PromotionProduct> PromotionProducts { get; set; }
+            = new List<PromotionProduct>();
     }
+
 }

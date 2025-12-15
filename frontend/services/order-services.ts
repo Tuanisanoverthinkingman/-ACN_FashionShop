@@ -41,10 +41,12 @@ export const getOrderById = async (id: number) => {
 export const createOrder = async (cartItemIds: number[]) => {
   try {
     const res = await api.post("/api/Order", cartItemIds);
+
     toast.success(res.data.message || "Tạo đơn hàng thành công");
     return res.data.order;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Tạo đơn hàng thất bại");
+    console.error(error);
+    toast.error(error.response?.data || "Tạo đơn hàng thất bại");
     throw error;
   }
 };

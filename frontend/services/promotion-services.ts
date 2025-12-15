@@ -1,7 +1,17 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
-export type PromotionApplyType = "General" | "Product" | "Category" | "User";
+export enum PromotionApplyType {
+  General = 0,
+  Product = 1,
+  Category = 2,
+  User = 3,
+}
+
+export enum PromotionStatus {
+  Active = 0,
+  Expired = 1,
+}
 
 export interface Promotion {
   promotionId: number;
@@ -11,15 +21,15 @@ export interface Promotion {
   description?: string;
   startDate: string;
   endDate: string;
-  status: "Active" | "Expired";
+  status: PromotionStatus;
 
   productIds: number[];
   categoryIds: number[];
   userIds: number[];
 
   // Mới thêm
-  ProductNames?: string[];
-  CategoryNames?: string[];
+  productNames?: string[];
+  categoryNames?: string[];
 }
 
 // ===============================
@@ -37,8 +47,8 @@ const transformPromotion = (promo: any): Promotion => ({
   productIds: promo.productIds ?? [],
   categoryIds: promo.categoryIds ?? [],
   userIds: promo.userIds ?? [],
-  ProductNames: promo.productNames ?? [],
-  CategoryNames: promo.categoryNames ?? [],
+  productNames: promo.productNames ?? [],
+  categoryNames: promo.categoryNames ?? [],
 });
 
 // ===============================
@@ -52,7 +62,7 @@ const handleError = (error: any) => {
 // PUBLIC – Promotion active
 // GET /api/promotions
 // ===============================
-export const getActivePromotions = async (): Promise<Promotion[]> => {
+export const getActivePromotions = async (): Promise<Promotion[] | undefined> => {
   try {
     const res = await api.get("/api/promotions");
     return res.data.map(transformPromotion);
@@ -64,9 +74,8 @@ export const getActivePromotions = async (): Promise<Promotion[]> => {
 
 // ===============================
 // ADMIN – All promotions
-// GET /api/promotions/admin
 // ===============================
-export const getAllPromotionsAdmin = async (): Promise<Promotion[]> => {
+export const getAllPromotionsAdmin = async (): Promise<Promotion[] | undefined> => {
   try {
     const res = await api.get("/api/promotions/admin");
     return res.data.map(transformPromotion);
@@ -138,5 +147,39 @@ export const togglePromotionStatus = async (id: number) => {
     return res.data;
   } catch (error) {
     handleError(error);
+  }
+};
+
+// ===============================
+// USER – Lấy promotion có thể claim (General)
+// GET /api/promotions/claimable
+// ===============================
+export const getClaimablePromotions = async (): Promise<Promotion[]> => {
+  try {
+    const res = await api.get("/api/promotions/claimable");
+    return res.data.map(transformPromotion);
+  } catch (error) {
+    handleError(error);
+    return [];
+  }
+};
+
+export const isPromoApplicable = (
+  promo: Promotion,
+  productId: number,
+  categoryId?: number
+): boolean => {
+  switch (promo.applyType) {
+    case PromotionApplyType.General:
+    case PromotionApplyType.User:
+      return true;
+    case PromotionApplyType.Product:
+      return promo.productIds.includes(productId);
+    case PromotionApplyType.Category:
+      return categoryId
+        ? promo.categoryIds.includes(categoryId)
+        : false;
+    default:
+      return false;
   }
 };

@@ -16,7 +16,6 @@ export const getCart = async () => {
 export const addToCart = async (data: { productId: number; quantity: number }) => {
   try {
     const res = await api.post("/api/CartItems/add", data);
-    toast.success(res.data.message || "Thêm vào giỏ hàng thành công");
     return res.data;
   } catch (error: any) {
     toast.error(error.response?.data || "Có lỗi xảy ra");

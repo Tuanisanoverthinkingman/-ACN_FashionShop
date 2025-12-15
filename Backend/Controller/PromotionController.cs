@@ -23,6 +23,11 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] PromotionRequest request)
         {
+            if (_context.promotions.Any(p => p.Code == request.Code))
+            {
+                return BadRequest(new { message = "Code promotion đã tồn tại" });
+            }
+
             if (request.StartDate >= request.EndDate)
                 return BadRequest(new { message = "StartDate phải nhỏ hơn EndDate" });
 
@@ -72,7 +77,6 @@ namespace Controllers
         // 3. ADMIN - Lấy chi tiết promotion
         // =========================
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetById(int id)
         {
             var promo = await _context.promotions
@@ -121,7 +125,10 @@ namespace Controllers
             // Clear toàn bộ mapping cũ
             promo.PromotionProducts.Clear();
             promo.PromotionCategories.Clear();
-            promo.UserPromotions.Clear();
+            if (request.ApplyType != PromotionApplyType.User)
+            {
+                promo.UserPromotions.Clear();
+            }
 
             AttachMappings(promo, request);
 
@@ -161,9 +168,13 @@ namespace Controllers
             var promo = await _context.promotions.FindAsync(id);
             if (promo == null)
                 return NotFound(new { message = "Promotion không tồn tại" });
+            if (promo.EndDate < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Promotion đã hết hạn, không thể kích hoạt" });
+            }
 
             promo.Status = promo.Status == PromotionStatus.Active
-                ? PromotionStatus.Expried
+                ? PromotionStatus.Expired
                 : PromotionStatus.Active;
 
             await _context.SaveChangesAsync();
@@ -209,6 +220,37 @@ namespace Controllers
                 ProductNames = p.PromotionProducts.Select(pp => pp.Product.Name),
                 CategoryIds = p.PromotionCategories.Select(pc => pc.CategoryId),
                 CategoryNames = p.PromotionCategories.Select(pc => pc.Category.Name)
+            });
+
+            return Ok(result);
+        }
+
+        // =========================
+        // PUBLIC - Lấy promotion có thể claim (General)
+        // =========================
+        [HttpGet("claimable")]
+        public async Task<IActionResult> GetClaimablePromotions()
+        {
+            var now = DateTime.UtcNow;
+
+            var promos = await _context.promotions
+                .Where(p =>
+                    p.Status == PromotionStatus.Active &&
+                    p.StartDate <= now &&
+                    p.EndDate >= now &&
+                    p.ApplyType == PromotionApplyType.General // Chỉ General
+                )
+                .ToListAsync();
+
+            var result = promos.Select(p => new
+            {
+                p.PromotionId,
+                p.Code,
+                p.DiscountPercent,
+                p.Description,
+                p.StartDate,
+                p.EndDate,
+                p.ApplyType
             });
 
             return Ok(result);

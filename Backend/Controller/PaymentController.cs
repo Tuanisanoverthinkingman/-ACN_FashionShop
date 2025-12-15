@@ -40,13 +40,13 @@ namespace Controllers
             if (order.Payments.Any(p => p.Status == PaymentStatus.Paid))
                 return BadRequest(new { message = "Đơn hàng đã được thanh toán." });
 
-            // ===== LOAD PROMOTION =====
-            Promotion? promo = null;
+            // ===== LOAD SELECTED PROMO =====
+            Promotion? selectedPromo = null;
             UserPromotion? userPromo = null;
 
             if (dto.PromoId.HasValue)
             {
-                promo = await _context.promotions
+                selectedPromo = await _context.promotions
                     .Include(p => p.UserPromotions)
                     .Include(p => p.PromotionProducts)
                     .Include(p => p.PromotionCategories)
@@ -57,14 +57,13 @@ namespace Controllers
                         p.EndDate >= now
                     );
 
-                if (promo == null)
+                if (selectedPromo == null)
                     return BadRequest(new { message = "Mã khuyến mãi không hợp lệ hoặc đã hết hạn." });
 
-                // Chỉ General / User mới cần UserPromotion
-                if (promo.ApplyType == PromotionApplyType.General ||
-                    promo.ApplyType == PromotionApplyType.User)
+                if (selectedPromo.ApplyType == PromotionApplyType.General ||
+                    selectedPromo.ApplyType == PromotionApplyType.User)
                 {
-                    userPromo = promo.UserPromotions.FirstOrDefault(up =>
+                    userPromo = selectedPromo.UserPromotions.FirstOrDefault(up =>
                         up.UserId == userId && !up.IsUsed
                     );
 
@@ -73,7 +72,16 @@ namespace Controllers
                 }
             }
 
-            // ===== TÍNH TIỀN =====
+            // ===== LOAD ALL ACTIVE PROMOS =====
+            var activePromos = await _context.promotions
+                .Include(p => p.PromotionProducts)
+                .Include(p => p.PromotionCategories)
+                .Include(p => p.UserPromotions)
+                .Where(p => p.Status == PromotionStatus.Active &&
+                            p.StartDate <= now &&
+                            p.EndDate >= now)
+                .ToListAsync();
+
             decimal totalAmount = 0;
             decimal finalAmount = 0;
             var productBreakdown = new List<object>();
@@ -89,33 +97,29 @@ namespace Controllers
                 }
 
                 decimal original = od.UnitPrice * od.Quantity;
-                bool eligible = false;
+                decimal bestDiscount = 0;
 
-                if (promo != null)
+                // --- AUTO APPLY: Product/Category promos ---
+                foreach (var promo in activePromos)
                 {
-                    switch (promo.ApplyType)
+                    bool applicable = promo.ApplyType switch
                     {
-                        case PromotionApplyType.General:
-                        case PromotionApplyType.User:
-                            eligible = true;
-                            break;
+                        PromotionApplyType.Product => promo.PromotionProducts.Any(pp => pp.ProductId == od.ProductId),
+                        PromotionApplyType.Category => promo.PromotionCategories.Any(pc => pc.CategoryId == od.Product.CategoryId),
+                        _ => false
+                    };
 
-                        case PromotionApplyType.Product:
-                            eligible = promo.PromotionProducts
-                                .Any(pp => pp.ProductId == od.ProductId);
-                            break;
-
-                        case PromotionApplyType.Category:
-                            eligible = promo.PromotionCategories
-                                .Any(pc => pc.CategoryId == od.Product.CategoryId);
-                            break;
-                    }
+                    if (applicable)
+                        bestDiscount = Math.Max(bestDiscount, (decimal)promo.DiscountPercent);
                 }
 
-                decimal discounted = eligible
-                    ? original * (1 - (decimal)promo!.DiscountPercent / 100)
-                    : original;
+                // --- APPLY SELECTED GEN/User promo ---
+                if (selectedPromo != null && (selectedPromo.ApplyType == PromotionApplyType.General || selectedPromo.ApplyType == PromotionApplyType.User))
+                {
+                    bestDiscount = Math.Max(bestDiscount, (decimal)selectedPromo.DiscountPercent);
+                }
 
+                decimal discounted = original * (1 - bestDiscount / 100);
                 totalAmount += original;
                 finalAmount += discounted;
 
@@ -127,7 +131,7 @@ namespace Controllers
                     od.UnitPrice,
                     OriginalAmount = original,
                     DiscountedAmount = discounted,
-                    DiscountApplied = eligible ? promo!.DiscountPercent : 0
+                    DiscountApplied = bestDiscount
                 });
             }
 
@@ -153,7 +157,7 @@ namespace Controllers
                 Amount = finalAmount,
                 Status = PaymentStatus.Pending,
                 Address = dto.Address,
-                PromoId = promo?.PromotionId,
+                PromoId = selectedPromo?.PromotionId,
                 CreateAt = now
             };
 

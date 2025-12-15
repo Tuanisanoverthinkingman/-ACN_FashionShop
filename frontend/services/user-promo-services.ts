@@ -15,6 +15,10 @@ export interface UserPromotion {
   applyType: PromotionApplyType;
   isUsed: boolean;
 
+  description?: string; 
+  startDate?: string;  
+  endDate?: string;
+
   productIds: number[];
   categoryIds: number[];
 }
@@ -28,7 +32,6 @@ const handleError = (error: any) => {
 
 // ===============================
 // 1. Promo user đã claim
-// GET /api/user-promotions/my
 // ===============================
 export const getMyPromotions = async (): Promise<UserPromotion[]> => {
   try {
@@ -42,7 +45,6 @@ export const getMyPromotions = async (): Promise<UserPromotion[]> => {
 
 // ===============================
 // 2. Promo có thể dùng (checkout)
-// GET /api/user-promotions/available
 // ===============================
 export const getAvailablePromotions = async (): Promise<UserPromotion[]> => {
   try {
@@ -56,7 +58,6 @@ export const getAvailablePromotions = async (): Promise<UserPromotion[]> => {
 
 // ===============================
 // 3. Claim promotion
-// POST /api/user-promotions/claim/{id}
 // ===============================
 export const claimPromotion = async (promotionId: number) => {
   try {
@@ -72,7 +73,36 @@ export const claimPromotion = async (promotionId: number) => {
 };
 
 // ===============================
-// 4. Check promo áp cho product
+// 4. Lấy promo áp dụng cho 1 product
+// ===============================
+export const getApplicablePromotionsForProduct = async (
+  productId: number,
+  categoryId?: number
+): Promise<UserPromotion[]> => {
+  try {
+    const params = new URLSearchParams({ productId: productId.toString() });
+    if (categoryId !== undefined) params.append("categoryId", categoryId.toString());
+
+    const res = await api.get(`/api/user-promotions/applicable?${params.toString()}`);
+    return res.data;
+  } catch (error) {
+    handleError(error);
+    return [];
+  }
+};
+
+export const getAllPromotionsForUser = async (): Promise<UserPromotion[]> => {
+  try {
+    const res = await api.get("/api/user-promotions/all-for-user");
+    return res.data;
+  } catch (error) {
+    handleError(error);
+    return [];
+  }
+};
+
+// ===============================
+// 5. Check promo áp cho product
 // ===============================
 export const isPromoApplicable = (
   promo: UserPromotion,
@@ -80,14 +110,25 @@ export const isPromoApplicable = (
   categoryId?: number
 ): boolean => {
   switch (promo.applyType) {
-    case 0: // General
-    case 3: // User
+    case PromotionApplyType.General:
+    case PromotionApplyType.User:
       return true;
-    case 1: // Product
+    case PromotionApplyType.Product:
       return promo.productIds.includes(productId);
-    case 2: // Category
-      return categoryId ? promo.categoryIds.includes(categoryId) : false;
+    case PromotionApplyType.Category:
+      return categoryId
+        ? promo.categoryIds.includes(categoryId)
+        : false;
     default:
       return false;
+  }
+};
+
+export const getGeneralPromotions = async (): Promise<UserPromotion[]> => {
+  try {
+    const res = await api.get("/api/user-promotions/general");
+    return res.data;
+  } catch {
+    return [];
   }
 };

@@ -7,25 +7,32 @@ import { FaShoppingCart } from "react-icons/fa";
 import { Product, getAll as getProducts } from "@/services/product-services";
 import { Category, getAllCategories } from "@/services/category-services";
 import { addToCart } from "@/services/cart-services";
+import { Promotion, PromotionApplyType, getActivePromotions } from "@/services/promotion-services";
 
 export default function ProductBanner() {
   const PRODUCTS_PER_PAGE = 12;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<"default" | "price-asc" | "price-desc">("default");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Lấy sản phẩm + danh mục
+  // Lấy sản phẩm, danh mục, promotion
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productData, categoryData] = await Promise.all([getProducts(), getAllCategories()]);
+        const [productData, categoryData, promoData] = await Promise.all([
+          getProducts(),
+          getAllCategories(),
+          getActivePromotions()
+        ]);
         setProducts(productData || []);
         setCategories(categoryData || []);
+        setPromotions(promoData || []);
       } catch (error) {
         console.error("Lỗi khi lấy dữ liệu:", error);
       } finally {
@@ -61,6 +68,26 @@ export default function ProductBanner() {
     currentPage * PRODUCTS_PER_PAGE
   );
 
+  // --- Tính giá giảm cho sản phẩm ---
+  const getDiscountedPrice = (product: Product) => {
+    // Chỉ lấy promo áp dụng cho product này
+    const applicablePromos = promotions.filter(promo => {
+      switch (promo.applyType) {
+        case PromotionApplyType.General:
+          return false; // Nếu muốn general áp dụng cho tất cả sản phẩm, đổi thành true
+        case PromotionApplyType.Product:
+          return promo.productIds?.includes(product.id);
+        case PromotionApplyType.Category:
+          return promo.categoryIds?.includes(product.categoryId);
+        default:
+          return false;
+      }
+    });
+
+    const maxDiscount = applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
+    return product.price * (1 - maxDiscount / 100);
+  };
+
   const handleAddToCart = async (productId: number) => {
     try {
       const token = localStorage.getItem("token");
@@ -95,11 +122,7 @@ export default function ProductBanner() {
           <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
             <button
               onClick={() => setSelectedCategory("all")}
-              className={`flex-shrink-0 px-4 py-2 rounded-full border ${
-                selectedCategory === "all"
-                  ? "bg-blue-400 text-white"
-                  : "bg-white hover:bg-blue-50 text-gray-700"
-              } transition`}
+              className={`flex-shrink-0 px-4 py-2 rounded-full border ${selectedCategory === "all" ? "bg-blue-400 text-white" : "bg-white hover:bg-blue-50 text-gray-700"} transition`}
             >
               Tất cả
             </button>
@@ -107,11 +130,7 @@ export default function ProductBanner() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id.toString())}
-                className={`flex-shrink-0 px-4 py-2 rounded-full border ${
-                  selectedCategory === cat.id.toString()
-                    ? "bg-blue-600 text-white"
-                    : "bg-white hover:bg-blue-50 text-gray-700"
-                } transition`}
+                className={`flex-shrink-0 px-4 py-2 rounded-full border ${selectedCategory === cat.id.toString() ? "bg-blue-600 text-white" : "bg-white hover:bg-blue-50 text-gray-700"} transition`}
               >
                 {cat.name}
               </button>
@@ -142,53 +161,58 @@ export default function ProductBanner() {
 
         {/* Product Grid */}
         {currentProducts.length === 0 ? (
-          <p className="text-center text-gray-500 italic">
-            Không có sản phẩm nào phù hợp 🥺
-          </p>
+          <p className="text-center text-gray-500 italic">Không có sản phẩm nào phù hợp 🥺</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {currentProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col"
-              >
-                <Link href={`/product/${product.id}`}>
-                  <img
-                    src={product.imageUrl || "/images/default.jpg"}
-                    alt={product.name}
-                    className="w-full h-56 object-cover hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="p-5 flex flex-col">
-                    <h3 className="font-semibold text-lg text-gray-800 mb-2 line-clamp-2">
-                      {product.name}
-                    </h3>
-                    <p className="text-gray-500 text-sm mb-3 line-clamp-3">
-                      {product.description || "Không có mô tả."}
-                    </p>
-                    <p className="text-xl font-bold text-gray-800 mb-3">
-                      {product.price?.toLocaleString()}₫
-                    </p>
-                  </div>
-                </Link>
+            {currentProducts.map((product) => {
+              const discountedPrice = getDiscountedPrice(product);
+              const hasDiscount = discountedPrice < product.price;
 
-                <div className="px-5 pb-5 mt-auto">
-                  <button
-                    onClick={() => handleAddToCart(product.id)}
-                    className="w-full flex rounded-lg overflow-hidden border border-gray-300 hover:shadow-md transition"
-                  >
-                    <span className="flex-[3] bg-white px-4 py-2 text-black font-semibold text-center">
-                      Thêm vào giỏ hàng
-                    </span>
-                    <span className="flex-[1] bg-blue-400 text-white flex items-center justify-center">
-                      <FaShoppingCart />
-                    </span>
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+              return (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col h-full"
+                >
+                  <Link href={`/product/${product.id}`} className="block">
+                    <img
+                      src={product.imageUrl || "/images/default.jpg"}
+                      alt={product.name}
+                      className="w-full h-56 object-cover hover:scale-105 transition-transform duration-500"
+                    />
+                  </Link>
+
+                  <div className="p-5 flex flex-col flex-1">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-2 line-clamp-2">{product.name}</h3>
+                    <p className="text-gray-500 text-sm mb-3 line-clamp-3">{product.description || "Không có mô tả."}</p>
+                    <div className="mt-auto">
+                      <p className="text-xl font-bold text-gray-800 mb-3">
+                        {hasDiscount ? (
+                          <>
+                            <span className="line-through text-gray-400 mr-2">{product.price.toLocaleString()}₫</span>
+                            <span className="text-red-500">{discountedPrice.toLocaleString()}₫</span>
+                          </>
+                        ) : (
+                          <span>{product.price.toLocaleString()}₫</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-5 pb-5 mt-auto">
+                    <button
+                      onClick={() => handleAddToCart(product.id)}
+                      className="w-full flex rounded-lg overflow-hidden border border-gray-300 hover:shadow-md transition"
+                    >
+                      <span className="flex-[3] bg-white px-4 py-2 text-black font-semibold text-center">Thêm vào giỏ hàng</span>
+                      <span className="flex-[1] bg-blue-400 text-white flex items-center justify-center"><FaShoppingCart /></span>
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         )}
 
@@ -197,7 +221,7 @@ export default function ProductBanner() {
           <div className="flex justify-center gap-2 mt-8">
             <button
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => prev - 1)}
+              onClick={() => setCurrentPage(prev => prev - 1)}
               className="px-4 py-2 border rounded-full disabled:opacity-50 hover:bg-blue-50 transition"
             >
               Trang trước
@@ -206,16 +230,14 @@ export default function ProductBanner() {
               <button
                 key={idx}
                 onClick={() => setCurrentPage(idx + 1)}
-                className={`px-4 py-2 border rounded-full ${
-                  currentPage === idx + 1 ? "bg-blue-600 text-white" : "hover:bg-blue-50"
-                } transition`}
+                className={`px-4 py-2 border rounded-full ${currentPage === idx + 1 ? "bg-blue-600 text-white" : "hover:bg-blue-50"} transition`}
               >
                 {idx + 1}
               </button>
             ))}
             <button
               disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((prev) => prev + 1)}
+              onClick={() => setCurrentPage(prev => prev + 1)}
               className="px-4 py-2 border rounded-full disabled:opacity-50 hover:bg-blue-50 transition"
             >
               Trang sau
