@@ -81,7 +81,6 @@ namespace Controllers
                         .ThenInclude(od => od.Product)
                     .Include(o => o.Payments)
                     .FirstOrDefaultAsync(o => o.OrderId == newOrder.OrderId);
-
                 return Ok(new { message = "Tạo đơn hàng thành công!", order = createdOrder });
             }
             catch (Exception ex)
@@ -161,5 +160,73 @@ namespace Controllers
 
             return Ok(new { message = "Xoá đơn hàng thành công!" });
         }
+
+        // Tạo đơn trực tiếp bằng ProductId
+        [HttpPost("order-by-product")]
+        [Authorize]
+        public async Task<IActionResult> OrderByProduct([FromBody] OrderByProductDto dto)
+        {
+            try
+            {
+                var userId = GetUserIdFromClaims();
+
+                if (dto.ProductId <= 0 || dto.Quantity <= 0)
+                    return BadRequest(new { message = "Dữ liệu không hợp lệ!" });
+
+                var product = await _context.products
+                    .FirstOrDefaultAsync(p => p.Id == dto.ProductId);
+
+                if (product == null)
+                    return NotFound(new { message = "Sản phẩm không tồn tại!" });
+
+                var total = product.Price * dto.Quantity;
+
+                var order = new Order
+                {
+                    UserId = userId,
+                    TotalAmount = total,
+                    OrderDate = DateTime.Now,
+                    OrderStatus = "Pending"
+                };
+
+                _context.orders.Add(order);
+                await _context.SaveChangesAsync();
+
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = order.OrderId,
+                    ProductId = product.Id,
+                    Quantity = dto.Quantity,
+                    UnitPrice = product.Price
+                };
+
+                _context.orderDetails.Add(orderDetail);
+                await _context.SaveChangesAsync();
+
+                var createdOrder = await _context.orders
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(d => d.Product)
+                    .Include(o => o.Payments)
+                    .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
+
+                return Ok(new
+                {
+                    message = "Thanh toán sản phẩm thành công!",
+                    order = createdOrder
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi server nội bộ: " + ex.Message
+                });
+            }
+        }
+    }
+    public class OrderByProductDto
+    {
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
     }
 }

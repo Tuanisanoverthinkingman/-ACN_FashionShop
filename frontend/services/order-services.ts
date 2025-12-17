@@ -62,3 +62,22 @@ export const deleteOrder = async (id: number) => {
     throw error;
   }
 };
+
+export const orderByProduct = async (
+  productId: number,
+  quantity: number
+) => {
+  try {
+    const res = await api.post("/api/Order/order-by-product", {
+      productId,
+      quantity
+    });
+    return res.data.order;
+  } catch (error: any) {
+    console.error(error);
+    toast.error(
+      error.response?.data?.message || "Thanh toán sản phẩm thất bại"
+    );
+    throw error;
+  }
+};

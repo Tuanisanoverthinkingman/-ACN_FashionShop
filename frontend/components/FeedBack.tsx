@@ -17,19 +17,26 @@ interface FeedbackProps {
   isAdmin?: boolean;
 }
 
-export default function Feedback({ productId, currentUserId, isAdmin }: FeedbackProps) {
+export default function Feedback({
+  productId,
+  currentUserId,
+  isAdmin,
+}: FeedbackProps) {
   const [feedbacks, setFeedbacks] = useState<FeedbackData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Tạo mới
   const [newContent, setNewContent] = useState("");
   const [newRating, setNewRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
 
+  // Chỉnh sửa
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [editingRating, setEditingRating] = useState(0);
   const [editingHover, setEditingHover] = useState(0);
 
+  // Lấy feedback
   const fetchFeedbacks = async () => {
     try {
       setLoading(true);
@@ -37,6 +44,7 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
       setFeedbacks(data);
     } catch (err) {
       console.error(err);
+      toast.error("Không thể tải feedback");
     } finally {
       setLoading(false);
     }
@@ -46,14 +54,20 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
     fetchFeedbacks();
   }, [productId]);
 
+  // Tạo feedback
   const handleCreate = async () => {
     if (!newContent || newRating < 1 || newRating > 5) {
-      toast.error("Nội dung và đánh giá hợp lệ từ 1-5");
+      toast.error("Vui lòng nhập đánh giá và chọn sao");
       return;
     }
+
     try {
-      const data: FeedbackData = { productId, content: newContent, rating: newRating };
-      await createFeedback(data);
+      await createFeedback({
+        productId,
+        content: newContent,
+        rating: newRating,
+      });
+
       setNewContent("");
       setNewRating(0);
       setHoverRating(0);
@@ -63,14 +77,20 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
     }
   };
 
+  // Cập nhật feedback
   const handleUpdate = async (id: number) => {
     if (!editingContent || editingRating < 1 || editingRating > 5) {
       toast.error("Nội dung và đánh giá hợp lệ từ 1-5");
       return;
     }
+
     try {
-      const data: FeedbackData = { productId, content: editingContent, rating: editingRating };
-      await updateFeedback(id, data);
+      await updateFeedback(id, {
+        productId,
+        content: editingContent,
+        rating: editingRating,
+      });
+
       setEditingId(null);
       fetchFeedbacks();
     } catch (err) {
@@ -78,8 +98,10 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
     }
   };
 
+  // Xoá feedback
   const handleDelete = async (id: number) => {
     if (!confirm("Bạn có chắc muốn xoá feedback này?")) return;
+
     try {
       await deleteFeedback(id);
       fetchFeedbacks();
@@ -88,22 +110,21 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
     }
   };
 
-  // Render stars với hover và rating dùng FaStar
+  // Render sao
   const renderStars = (
     rating: number,
-    setRating?: (i: number) => void,
+    setRating?: (v: number) => void,
     hover?: number,
-    setHover?: (i: number) => void
+    setHover?: (v: number) => void
   ) =>
     Array.from({ length: 5 }).map((_, i) => {
-      const isHovering = hover !== undefined && hover > 0;
-      const filled = isHovering ? i < hover! : i < rating;
-      const isInteractive = !!setRating;
+      const filled = hover && hover > 0 ? i < hover : i < rating;
       return (
         <FaStar
           key={i}
-          className={`cursor-pointer transition-colors ${filled ? "text-yellow-400" : "text-gray-300"}`}
-          size={24}
+          size={22}
+          className={`transition-colors ${filled ? "text-yellow-400" : "text-gray-300"
+            } ${setRating ? "cursor-pointer" : ""}`}
           onClick={() => setRating && setRating(i + 1)}
           onMouseEnter={() => setHover && setHover(i + 1)}
           onMouseLeave={() => setHover && setHover(0)}
@@ -115,23 +136,25 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
 
   return (
     <div className="mt-10">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Đánh giá sản phẩm</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        Đánh giá sản phẩm
+      </h2>
 
-      {/* Form tạo feedback mới */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+      {/* Tạo feedback */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
         <textarea
-          className="w-full border border-gray-300 rounded-lg p-2 mb-2 resize-none"
+          className="w-full border rounded-lg p-2 mb-2 resize-none"
           rows={3}
           placeholder="Viết đánh giá của bạn..."
           value={newContent}
           onChange={(e) => setNewContent(e.target.value)}
         />
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex gap-1 mb-3">
           {renderStars(newRating, setNewRating, hoverRating, setHoverRating)}
         </div>
         <button
           onClick={handleCreate}
-          className="bg-blue-400 hover:bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
         >
           Gửi đánh giá
         </button>
@@ -143,16 +166,31 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
       ) : (
         <div className="space-y-4">
           {feedbacks.map((f) => (
-            <div key={f.id} className="bg-white p-4 rounded-lg shadow-sm flex flex-col gap-2">
+            <div
+              key={f.id}
+              className="bg-white p-4 rounded-lg shadow flex flex-col gap-2"
+            >
               <div className="flex justify-between items-center">
-                <p className="font-semibold text-gray-800">
-                  {f.userId === currentUserId ? "Bạn" : `User #${f.userId}`} -{" "}
-                  {editingId === f.id
-                    ? renderStars(editingRating, setEditingRating, editingHover, setEditingHover)
-                    : renderStars(f.rating)}
-                </p>
+                <div className="flex items-center gap-2 font-semibold">
+                  <span>
+                    {f.userId === currentUserId
+                      ? "Bạn"
+                      : f.userName || "Người dùng"}
+                  </span>
+                  <div className="flex gap-1">
+                    {editingId === f.id
+                      ? renderStars(
+                        editingRating,
+                        setEditingRating,
+                        editingHover,
+                        setEditingHover
+                      )
+                      : renderStars(f.rating)}
+                  </div>
+                </div>
+
                 {(isAdmin || f.userId === currentUserId) && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 text-sm">
                     <button
                       onClick={() => {
                         setEditingId(f.id!);
@@ -160,13 +198,13 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
                         setEditingRating(f.rating);
                         setEditingHover(0);
                       }}
-                      className="text-blue-500 hover:underline text-sm"
+                      className="text-blue-500 hover:underline"
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => handleDelete(f.id!)}
-                      className="text-red-500 hover:underline text-sm"
+                      className="text-red-500 hover:underline"
                     >
                       Xoá
                     </button>
@@ -174,35 +212,40 @@ export default function Feedback({ productId, currentUserId, isAdmin }: Feedback
                 )}
               </div>
 
-              {editingId === f.id && (
-                <div className="flex flex-col gap-2 mt-2">
+              {editingId === f.id ? (
+                <>
                   <textarea
-                    className="w-full border border-gray-300 rounded-lg p-2 resize-none"
+                    className="w-full border rounded-lg p-2 resize-none"
                     rows={2}
                     value={editingContent}
                     onChange={(e) => setEditingContent(e.target.value)}
                   />
-                  <div className="flex items-center gap-2 mb-2">
-                    {renderStars(editingRating, setEditingRating, editingHover, setEditingHover)}
+                  <div className="flex gap-1">
+                    {renderStars(
+                      editingRating,
+                      setEditingRating,
+                      editingHover,
+                      setEditingHover
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleUpdate(f.id!)}
-                      className="bg-green-400 hover:bg-green-500 text-white py-1 px-3 rounded-lg"
+                      className="bg-green-500 text-white px-3 py-1 rounded"
                     >
                       Lưu
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-1 px-3 rounded-lg"
+                      className="bg-gray-300 px-3 py-1 rounded"
                     >
-                      Hủy
+                      Huỷ
                     </button>
                   </div>
-                </div>
+                </>
+              ) : (
+                <p className="text-gray-700">{f.content}</p>
               )}
-
-              {editingId !== f.id && <p className="text-gray-700">{f.content}</p>}
             </div>
           ))}
         </div>

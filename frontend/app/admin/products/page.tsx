@@ -24,6 +24,7 @@ import {
 } from "@/services/product-services";
 import { getAllCategories, Category } from "@/services/category-services";
 import { uploadImage } from "@/services/file-services";
+import type { UploadFile } from "antd/es/upload/interface";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,6 +34,9 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageFileList, setImageFileList] = useState<UploadFile[]>([]);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [excelFileList, setExcelFileList] = useState<UploadFile[]>([]);
 
   const [form] = Form.useForm();
 
@@ -68,27 +72,67 @@ export default function ProductsPage() {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    setRemoveImage(false);
+
     form.setFieldsValue({
       name: product.name,
       description: product.description,
       price: product.price,
       instock: product.instock,
       categoryId: product.categoryId,
-      imageUrl: product.imageUrl,
     });
+
+    if (product.imageUrl) {
+      setImageFileList([
+        {
+          uid: "-1",
+          name: "current-image.jpg",
+          status: "done",
+          url: product.imageUrl,
+        },
+      ]);
+    } else {
+      setImageFileList([]);
+    }
+
+    setImageFile(null);
     setModalOpen(true);
   };
 
   const handleAdd = () => {
     setEditingProduct(null);
+    setRemoveImage(false);
+
     form.resetFields();
+
+    // THÊM: hiển thị no_image
+    setImageFileList([
+      {
+        uid: "-1",
+        name: "no_image.png",
+        status: "done",
+        url: "/no_image.png",
+      },
+    ]);
+
+    setImageFile(null);
     setModalOpen(true);
   };
 
   const handleModalOk = async () => {
     try {
       const values = await form.validateFields();
-      let imageUrl = values.imageUrl;
+      let imageUrl: string | null = editingProduct?.imageUrl ?? null;
+
+      // THÊM SẢN PHẨM → mặc định null
+      if (!editingProduct) {
+        imageUrl = null;
+      }
+
+      if (removeImage) {
+        imageUrl = null; // XOÁ ẢNH
+      }
+
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
       }
@@ -110,6 +154,7 @@ export default function ProductsPage() {
 
       setModalOpen(false);
       setImageFile(null);
+      setImageFileList([]);
       fetchProducts();
     } catch (error) {
       console.error(error);
@@ -120,6 +165,7 @@ export default function ProductsPage() {
     if (!excelFile) return;
     await uploadExcelSheets(excelFile);
     setExcelFile(null);
+    setExcelFileList([]);
     fetchProducts();
   };
 
@@ -137,10 +183,13 @@ export default function ProductsPage() {
     {
       title: "Ảnh",
       key: "image",
-      render: (_: any, record: Product) =>
-        record.imageUrl ? (
-          <img src={record.imageUrl} alt="" style={{ width: 60 }} />
-        ) : null,
+      render: (_: any, record: Product) => (
+        <img
+          src={record.imageUrl || "/no_image.png"}
+          alt="product"
+          style={{ width: 60, objectFit: "cover" }}
+        />
+      ),
     },
     {
       title: "Actions",
@@ -173,12 +222,14 @@ export default function ProductsPage() {
         </Button>
 
         <Upload
-          beforeUpload={(file) => {
-            setExcelFile(file);
-            return false;
+          accept=".xlsx"
+          maxCount={1}
+          fileList={excelFileList}
+          beforeUpload={() => false}
+          onChange={({ fileList }) => {
+            setExcelFileList(fileList);
+            setExcelFile(fileList[0]?.originFileObj || null);
           }}
-          accept=".xlsx,.xls"
-          showUploadList={{ showRemoveIcon: true }}
         >
           <Button icon={<UploadOutlined />}>Upload Excel</Button>
         </Upload>
@@ -247,11 +298,21 @@ export default function ProductsPage() {
           </Form.Item>
           <Form.Item label="Ảnh sản phẩm">
             <Upload
-              beforeUpload={(file) => {
-                setImageFile(file);
-                return false;
+              fileList={imageFileList}
+              maxCount={1}
+              beforeUpload={() => false}
+              onChange={({ fileList }) => {
+                setImageFileList(fileList);
+
+                if (fileList.length === 0) {
+                  // user xoá ảnh
+                  setImageFile(null);
+                  setRemoveImage(true);
+                } else {
+                  setImageFile(fileList[0].originFileObj || null);
+                  setRemoveImage(false);
+                }
               }}
-              showUploadList={{ showRemoveIcon: true }}
             >
               <Button icon={<UploadOutlined />}>Chọn ảnh</Button>
             </Upload>

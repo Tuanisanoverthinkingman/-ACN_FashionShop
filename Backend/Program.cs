@@ -5,17 +5,19 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 using System.Security.Claims;
-
+using OfficeOpenXml;
 
 var builder = WebApplication.CreateBuilder(args);
 
+ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
 //Add database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("SQLServerConnection")
+    options.UseMySql(
+        builder.Configuration.GetConnectionString("MySQLConnection"),
+        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("MySQLConnection"))
     )
 );
-
 
 // Thêm Controller
 builder.Services.AddControllers()

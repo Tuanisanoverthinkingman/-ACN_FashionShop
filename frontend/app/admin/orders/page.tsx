@@ -6,6 +6,7 @@ import { getPaymentByOrderId } from "@/services/payment-services";
 import { getPromotionById, Promotion } from "@/services/promotion-services";
 import { getOrderDetailsForAdmin } from "@/services/orderdetail-services";
 import { toast } from "react-toastify";
+import { updatePaymentStatus } from "@/services/payment-services";
 
 interface OrderDetail {
   orderDetailId: number;
@@ -38,6 +39,7 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [payment, setPayment] = useState<Payment | null>(null);
   const [promotion, setPromotion] = useState<Promotion | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   const paymentStatusMap: Record<number, string> = {
     0: "Pending",
@@ -145,6 +147,9 @@ export default function AdminOrdersPage() {
                   >
                     View
                   </button>
+
+
+
                   <button
                     className="bg-red-500 text-white px-2 py-1 rounded"
                     onClick={async () => {
@@ -197,31 +202,59 @@ export default function AdminOrdersPage() {
               </tbody>
             </table>
 
-            {payment ? (
+            {payment && (
               <div className="mt-4 p-4 border rounded bg-gray-50">
                 <h3 className="font-bold mb-2">Thông tin thanh toán</h3>
+
                 <p>Phương thức: {payment.paymentMethod}</p>
                 <p>Địa chỉ: {payment.address}</p>
                 <p>Số tiền: {(payment.amount ?? 0).toLocaleString()}₫</p>
+
                 <p>
                   Trạng thái:{" "}
-                  <span className={statusColorMap[paymentStatusMap[payment.status]] || ""}>
-                    {statusTextMap[paymentStatusMap[payment.status]] || "Unknown"}
+                  <span
+                    className={statusColorMap[paymentStatusMap[payment.status]] || ""}
+                  >
+                    {statusTextMap[paymentStatusMap[payment.status]]}
                   </span>
                 </p>
+
                 {promotion && (
                   <p>
                     Mã khuyến mãi: {promotion.code} (-{promotion.discountPercent}%)
                   </p>
                 )}
-              </div>
-            ) : (
-              <div className="mt-4">
-                <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                  Thanh toán ngay
-                </button>
+
+                {/* ✅ NÚT XÁC NHẬN THANH TOÁN */}
+                {paymentStatusMap[payment.status] === "Pending" && (
+                  <button
+                    disabled={updating}
+                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                    onClick={async () => {
+                      if (!confirm("Xác nhận đánh dấu đơn hàng đã thanh toán?")) return;
+
+                      try {
+                        setUpdating(true);
+                        await updatePaymentStatus(payment.paymentId, "Paid");
+
+                        toast.success("Đã cập nhật trạng thái thanh toán");
+
+                        await fetchOrders();
+                        const pay = await getPaymentByOrderId(selectedOrder!.orderId);
+                        setPayment(pay);
+                      } catch (err) {
+                        toast.error("Cập nhật thanh toán thất bại");
+                      } finally {
+                        setUpdating(false);
+                      }
+                    }}
+                  >
+                    Xác nhận đã thanh toán
+                  </button>
+                )}
               </div>
             )}
+
 
             <div className="flex justify-end gap-2 mt-4">
               <button

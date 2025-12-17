@@ -7,8 +7,9 @@ import { motion } from "framer-motion";
 import { FaShoppingCart } from "react-icons/fa";
 import { getByCategoryId, Product } from "@/services/product-services";
 import { addToCart } from "@/services/cart-services";
-import { createOrder } from "@/services/order-services";
+import { createOrder, orderByProduct } from "@/services/order-services";
 import { getActivePromotions, Promotion, PromotionApplyType } from "@/services/promotion-services";
+
 import { toast } from "react-toastify";
 
 export default function CategoryPage() {
@@ -78,7 +79,7 @@ export default function CategoryPage() {
   }, [products, searchTerm, sortOption]);
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-  const currentProducts = filteredProducts.slice(
+const currentProducts = filteredProducts.slice(
     (currentPage - 1) * PRODUCTS_PER_PAGE,
     currentPage * PRODUCTS_PER_PAGE
   );
@@ -95,20 +96,18 @@ export default function CategoryPage() {
     }
   };
 
-  // --- Mua ngay ---
+  // --- Mua ngay (Order trực tiếp bằng ProductId) ---
   const handleBuyNow = async (productId: number) => {
     try {
-      const cartItem = await addToCart({ productId, quantity: 1 });
-      const cartItemId = cartItem.cartItemId;
-      if (!cartItemId) return toast.error("Không lấy được CartItemId 😢");
+      const order = await orderByProduct(productId, 1);
 
-      const order = await createOrder([cartItemId]);
-      toast.success("Tạo đơn hàng thành công 🎉");
+      toast.success("Mua ngay thành công 🎉");
       window.dispatchEvent(new Event("cartChanged"));
+
       router.push(`/checkout/${order.orderId}`);
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Tạo đơn hàng thất bại 😢");
+      toast.error(err.response?.data?.message || "Mua ngay thất bại 😢");
     }
   };
 
@@ -155,7 +154,7 @@ export default function CategoryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentProducts.map(product => {
-              const discountedPrice = getDiscountedPrice(product);
+const discountedPrice = getDiscountedPrice(product);
               const hasDiscount = discountedPrice < product.price;
 
               return (
@@ -215,7 +214,7 @@ export default function CategoryPage() {
           <div className="flex justify-center gap-2 mt-8">
             <button
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
+onClick={() => setCurrentPage(prev => prev - 1)}
               className="px-4 py-2 border rounded-full disabled:opacity-50 hover:bg-blue-50 transition"
             >
               Trang trước

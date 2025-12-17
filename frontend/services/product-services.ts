@@ -21,7 +21,7 @@ export interface ProductRequest {
   description: string;
   price: number;
   instock: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
   categoryId: number;
 }
 

@@ -74,88 +74,124 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UploadExcelSheets(IFormFile file)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest("File empty");
-
-            using var stream = new MemoryStream();
-            await file.CopyToAsync(stream);
-
-            using var package = new ExcelPackage(stream);
-
-            var errors = new List<string>(); // Lưu row lỗi
-
-            foreach (var worksheet in package.Workbook.Worksheets)
+            try
             {
-                string categoryName = worksheet.Name.Trim();
-                if (string.IsNullOrEmpty(categoryName)) continue;
+                if (file == null || file.Length == 0)
+                    return BadRequest("File empty");
 
-                // Tìm hoặc tạo category
-                var category = await _context.categories.FirstOrDefaultAsync(c => c.Name == categoryName);
-                if (category == null)
+                using var stream = new MemoryStream();
+                await file.CopyToAsync(stream);
+                stream.Position = 0;
+
+                using var package = new ExcelPackage(stream);
+
+                var errors = new List<string>();
+
+                foreach (var worksheet in package.Workbook.Worksheets)
                 {
-                    category = new Category { Name = categoryName };
-                    _context.categories.Add(category);
-                    await _context.SaveChangesAsync();
+                    if (worksheet.Dimension == null)
+                        continue;
+
+                    string categoryName = worksheet.Name.Trim();
+                    if (string.IsNullOrEmpty(categoryName)) continue;
+
+                    var category = await _context.categories
+                        .FirstOrDefaultAsync(c => c.Name == categoryName);
+
+                    if (category == null)
+                    {
+                        category = new Category { Name = categoryName };
+                        _context.categories.Add(category);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    int rowCount = worksheet.Dimension.Rows;
+
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        try
+                        {
+                            string name = worksheet.Cells[row, 1].Text?.Trim();
+                            if (string.IsNullOrEmpty(name))
+                            {
+                                errors.Add($"Sheet '{categoryName}', Row {row}: Name rỗng");
+                                continue;
+                            }
+
+                            string desc = worksheet.Cells[row, 2].Text?.Trim();
+
+                            if (!decimal.TryParse(
+                                worksheet.Cells[row, 3].Text.Replace(",", "").Trim(),
+                                out var price))
+                            {
+                                errors.Add($"Sheet '{categoryName}', Row {row}: Price không hợp lệ");
+                                continue;
+                            }
+
+                            int instock = int.TryParse(
+                                worksheet.Cells[row, 4].Text.Trim(),
+                                out var s) ? s : 0;
+
+                            string imageUrl = worksheet.Cells[row, 5].Text?.Trim();
+
+                            var product = new Product
+                            {
+                                Name = name,
+                                Description = desc,
+                                Price = price,
+                                Instock = instock,
+                                ImageUrl = imageUrl,
+                                CategoryId = category.Id,
+                                CreateAt = DateTime.UtcNow
+                            };
+
+                            _context.products.Add(product);
+                        }
+                        catch (Exception exRow)
+                        {
+                            Console.WriteLine(exRow.ToString());
+                            errors.Add($"Sheet '{categoryName}', Row {row}: {exRow.Message}");
+                        }
+                    }
                 }
 
-                int rowCount = worksheet.Dimension.Rows;
+                await _context.SaveChangesAsync();
 
-                for (int row = 2; row <= rowCount; row++) // row 1 là header
+                return Ok(new
                 {
-                    try
-                    {
-                        string name = worksheet.Cells[row, 1].Text.Trim();
-                        if (string.IsNullOrEmpty(name))
-                        {
-                            errors.Add($"Sheet '{categoryName}', Row {row}: Name rỗng");
-                            continue;
-                        }
-
-                        string desc = worksheet.Cells[row, 2].Text.Trim();
-                        if (!decimal.TryParse(worksheet.Cells[row, 3].Text.Trim(), out var price))
-                        {
-                            errors.Add($"Sheet '{categoryName}', Row {row}: Price không hợp lệ");
-                            price = 0;
-                        }
-
-                        int instock = int.TryParse(worksheet.Cells[row, 4].Text.Trim(), out var s) ? s : 0;
-                        string imageUrl = worksheet.Cells[row, 5].Text.Trim();
-
-                        var product = new Product
-                        {
-                            Name = name,
-                            Description = desc,
-                            Price = price,
-                            Instock = instock,
-                            ImageUrl = imageUrl,
-                            CategoryId = category.Id
-                        };
-
-                        _context.products.Add(product);
-                    }
-                    catch (Exception ex)
-                    {
-                        errors.Add($"Sheet '{categoryName}', Row {row}: Lỗi {ex.Message}");
-                    }
-                }
+                    message = errors.Any()
+                        ? "Upload xong nhưng có dòng lỗi"
+                        : "Upload thành công",
+                    errors
+                });
             }
+            catch (Exception ex)
+            {
+                // 🔥 LOG LỖI 
+                Console.WriteLine("===== UPLOAD EXCEL FATAL ERROR =====");
+                Console.WriteLine(ex.ToString());
+                Console.WriteLine("===================================");
 
-            await _context.SaveChangesAsync();
-
-            if (errors.Any())
-                return Ok(new { message = "Upload hoàn tất, có 1 số row lỗi", errors });
-
-            return Ok(new { message = "Upload thành công" });
+                return StatusCode(500, new
+                {
+                    message = "Upload Excel thất bại",
+                    error = ex.Message
+                });
+            }
         }
+
 
         //Cập nhật sản phẩm (Admin)
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Update(int id, [FromBody] Product request)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateProductRequest request)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             var product = await _context.products.FirstOrDefaultAsync(p => p.Id == id);
             if (product == null)
-                return NotFound();
+                return NotFound(new { message = "Sản phẩm không tồn tại." });
 
             // Nếu muốn kiểm tra lại CategoryId
             var category = await _context.categories.FindAsync(request.CategoryId);
@@ -166,12 +202,22 @@ namespace Controllers
             product.Description = request.Description;
             product.Price = request.Price;
             product.Instock = request.Instock;
-            product.ImageUrl = request.ImageUrl;
             product.CategoryId = request.CategoryId;
 
+            if (request.ImageUrl == null)
+            {
+                // user xoá ảnh
+                product.ImageUrl = null;
+            }
+            else
+            {
+                // user giữ ảnh hoặc upload ảnh mới
+                product.ImageUrl = request.ImageUrl;
+            }
+
             await _context.SaveChangesAsync();
-            product.Category = category;
-            return Ok(product);
+
+            return Ok(new { message = "Cập nhật sản phẩm thành công." });
         }
 
         //Xoá sản phẩm (Admin)
@@ -214,7 +260,17 @@ namespace Controllers
             public string Description { get; set; }
             public decimal Price { get; set; }
             public int Instock { get; set; }
-            public string ImageUrl { get; set; }
+            public string? ImageUrl { get; set; }
+            public int CategoryId { get; set; }
+        }
+
+        public class UpdateProductRequest
+        {
+            public string Name { get; set; }
+            public string Description { get; set; }
+            public decimal Price { get; set; }
+            public int Instock { get; set; }
+            public string? ImageUrl { get; set; }
             public int CategoryId { get; set; }
         }
     }

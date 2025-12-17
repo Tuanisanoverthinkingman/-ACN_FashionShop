@@ -12,7 +12,7 @@ namespace Models
         public int Id { get; set; }
 
         [Required]
-        [Column(TypeName = "nvarchar(max)")]
+        [Column(TypeName = "text")]
         public string Content { get; set; }
 
         [Required]
@@ -20,7 +20,6 @@ namespace Models
         [Range(1, 5, ErrorMessage = "Rating must be between 1 and 5.")]
         public int Rating { get; set; } // Điểm đánh giá từ 1 → 5
 
-        [Required]
         [ForeignKey("User")]
         public int UserId { get; set; }
         public User User { get; set; }

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { label } from "framer-motion/client";
+import "antd/dist/reset.css";
 
 const { Header, Content, Sider } = Layout;
 

@@ -86,7 +86,19 @@ namespace Controllers
             var category = await _context.categories.FirstOrDefaultAsync(q => q.Id == id);
 
             if (category == null)
-                return NotFound();
+                return NotFound(new { message = "Danh mục không tồn tại." });
+
+            // 🔴 KIỂM TRA CATEGORY CÓ PRODUCT KHÔNG
+            bool hasProducts = await _context.products
+                .AnyAsync(p => p.CategoryId == id);
+
+            if (hasProducts)
+            {
+                return BadRequest(new
+                {
+                    message = "Không thể xoá danh mục vì sản phẩm tồn tại trong danh mục."
+                });
+            }
 
             _context.categories.Remove(category);
             await _context.SaveChangesAsync();

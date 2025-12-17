@@ -15,7 +15,7 @@ namespace Models
         [Column(TypeName = "nvarchar(255)")]
         public string Name { get; set; }
 
-        [Column(TypeName = "nvarchar(max)")]
+        [Column(TypeName = "longtext")]
         public string Description { get; set; }
 
         [Required]
