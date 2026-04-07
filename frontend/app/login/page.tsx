@@ -99,7 +99,7 @@ export default function LoginPage() {
                         onClick={() => router.push("/send-verify-email")}
                         className="text-sm text-blue-500 hover:underline transition font-medium"
                     >
-                        Gửi lại email xác thực
+                        Gửi email xác thực
                     </button>
                 </div>
 

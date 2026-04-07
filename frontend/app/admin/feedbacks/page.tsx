@@ -88,12 +88,12 @@ export default function AdminFeedbacksPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Quản lý Feedbacks</h1>
+      <h1 className="text-xl font-bold mb-4">Quản lý phản hồi</h1>
 
       {/* Form chỉnh sửa */}
       {editingFeedback && (
         <div className="mb-6 p-4 border rounded-md">
-          <h2 className="font-semibold mb-2">Cập nhật Feedback</h2>
+          <h2 className="font-semibold mb-2">Cập nhật phản hồi</h2>
           <div className="flex flex-col gap-2">
             <textarea
               className="border p-2"
@@ -164,12 +164,12 @@ export default function AdminFeedbacksPage() {
                 <td className="border p-2">{fb.content}</td>
                 <td className="border p-2">{fb.rating}</td>
                 <td className="border p-2 flex gap-2">
-                  <button
+                  {/* <button
                     className="bg-yellow-500 text-white px-2 py-1 rounded"
                     onClick={() => handleEdit(fb)}
                   >
                     Edit
-                  </button>
+                  </button> */}
                   <button
                     className="bg-red-500 text-white px-2 py-1 rounded"
                     onClick={() => handleDelete(fb.id!)}

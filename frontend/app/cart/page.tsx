@@ -220,7 +220,31 @@ export default function CartPage() {
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => handleQuantityChange(item.cartItemId, item.quantity - 1)} className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">-</button>
-              <span className="text-gray-800">{item.quantity}</span>
+              <input
+                type="number"
+                min={1}
+                value={item.quantity}
+                onChange={(e) =>
+                  setCartItems(prev =>
+                    prev.map(ci =>
+                      ci.cartItemId === item.cartItemId
+                        ? { ...ci, quantity: Number(e.target.value) }
+                        : ci
+                    )
+                  )
+                }
+                onBlur={() =>
+                  handleQuantityChange(item.cartItemId, item.quantity)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleQuantityChange(item.cartItemId, item.quantity);
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="w-14 text-center border rounded px-1 py-0.5"
+              />
+
               <button onClick={() => handleQuantityChange(item.cartItemId, item.quantity + 1)} className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">+</button>
             </div>
             <button onClick={() => handleDelete(item.cartItemId)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Xóa</button>

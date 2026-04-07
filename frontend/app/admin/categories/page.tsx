@@ -88,7 +88,7 @@ export default function CategoriesPage() {
     { title: "Tên danh mục", dataIndex: "name", key: "name" },
     { title: "Mô tả", dataIndex: "description", key: "description" },
     {
-      title: "Actions",
+      title: "Hành động",
       key: "actions",
       render: (_: any, record: Category) => (
         <Space>

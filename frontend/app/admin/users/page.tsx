@@ -48,12 +48,12 @@ export default function UsersPage() {
     const columns = [
         { title: "ID", dataIndex: "id", key: "id" },
         { title: "Username", dataIndex: "username", key: "username" },
-        { title: "Full Name", dataIndex: "fullName", key: "fullName" },
+        { title: "Họ tên", dataIndex: "fullName", key: "fullName" },
         { title: "Email", dataIndex: "email", key: "email" },
-        { title: "Phone", dataIndex: "phone", key: "phone" },
-        { title: "Role", dataIndex: "role", key: "role" },
+        { title: "Điện thoại", dataIndex: "phone", key: "phone" },
+        { title: "Vai trò", dataIndex: "role", key: "role" },
         {
-            title: "Status",
+            title: "Trạng thái",
             key: "status",
             render: (_: any, record: User) => (
                 <span className={record.isActive ? "text-green-600" : "text-red-600"}>
@@ -62,7 +62,7 @@ export default function UsersPage() {
             ),
         },
         {
-            title: "Actions",
+            title: "Hành động",
             key: "actions",
             render: (_: any, record: User) => (
                 <Space>
@@ -81,7 +81,7 @@ export default function UsersPage() {
 
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-4">Users Management</h1>
+            <h1 className="text-2xl font-bold mb-4">Quản lý người dùng</h1>
             <Table
                 rowKey="id"
                 dataSource={users}

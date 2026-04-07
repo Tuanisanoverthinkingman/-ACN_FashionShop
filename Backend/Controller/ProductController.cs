@@ -56,6 +56,7 @@ namespace Controllers
             {
                 Name = request.Name,
                 Description = request.Description,
+                CostPrice = request.CostPrice,
                 Price = request.Price,
                 Instock = request.Instock,
                 ImageUrl = request.ImageUrl,
@@ -134,10 +135,17 @@ namespace Controllers
 
                             string imageUrl = worksheet.Cells[row, 5].Text?.Trim();
 
+                            if (!decimal.TryParse(worksheet.Cells[row, 6].Text.Replace(",", "").Trim(), out var costPrice))
+                            {
+                                errors.Add($"Sheet '{categoryName}', Row {row}: CostPrice không hợp lệ");
+                                continue;
+                            }
+
                             var product = new Product
                             {
                                 Name = name,
                                 Description = desc,
+                                CostPrice = costPrice,
                                 Price = price,
                                 Instock = instock,
                                 ImageUrl = imageUrl,
@@ -258,6 +266,7 @@ namespace Controllers
         {
             public string Name { get; set; }
             public string Description { get; set; }
+            public decimal CostPrice { get; set; }
             public decimal Price { get; set; }
             public int Instock { get; set; }
             public string? ImageUrl { get; set; }
@@ -268,6 +277,7 @@ namespace Controllers
         {
             public string Name { get; set; }
             public string Description { get; set; }
+            public decimal CostPrice { get; set; }
             public decimal Price { get; set; }
             public int Instock { get; set; }
             public string? ImageUrl { get; set; }

@@ -20,7 +20,11 @@ namespace Models
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal Price { get; set; }
+        public decimal CostPrice { get; set; } // Giá nhập
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Price { get; set; } // Giá bán
 
         [Required]
         [Column(TypeName = "int")]

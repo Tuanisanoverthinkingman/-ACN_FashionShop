@@ -111,6 +111,20 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Ecommerce API v1");
         c.RoutePrefix = string.Empty;
     });
+    // Tự động mở Swagger UI trên trình duyệt mặc định
+    var swaggerUrl = "http://localhost:5146";
+    try
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = swaggerUrl,
+            UseShellExecute = true
+        });
+    }
+    catch
+    {
+        // Nếu trình duyệt không mở được, bỏ qua
+    }
 }
 
 

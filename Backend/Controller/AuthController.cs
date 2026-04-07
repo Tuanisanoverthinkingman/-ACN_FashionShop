@@ -117,7 +117,6 @@ public class AuthController : Controller
     }
 }
 
-
 public class LoginRequest
 {
     public String Username { get; set; }

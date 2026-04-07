@@ -202,23 +202,23 @@ export default function AdminPromotionsPage() {
 
     return (
         <div className="p-4">
-            <h1 className="text-xl font-bold mb-4">Quản lý Promotions</h1>
+            <h1 className="text-xl font-bold mb-4">Quản lý mã giảm giá</h1>
 
             {/* Form tạo / cập nhật */}
             <div className="mb-6 p-4 border rounded-md">
                 <h2 className="font-semibold mb-2">
-                    {editingPromo ? "Cập nhật Promotion" : "Tạo Promotion"}
+                    {editingPromo ? "Cập nhật mã" : "Tạo mã"}
                 </h2>
                 <div className="flex flex-col gap-2">
                     <input
                         className="border p-2"
-                        placeholder="Code"
+                        placeholder="Mã"
                         value={code}
                         onChange={e => setCode(e.target.value)}
                     />
                     <input
                         className="border p-2"
-                        placeholder="Description"
+                        placeholder="Mô tả"
                         value={desc}
                         onChange={e => setDesc(e.target.value)}
                     />
@@ -289,13 +289,13 @@ export default function AdminPromotionsPage() {
                 <table className="w-full border">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th className="border p-2">Code</th>
-                            <th className="border p-2">Discount</th>
-                            <th className="border p-2">ApplyType</th>
-                            <th className="border p-2">StartDate</th>
-                            <th className="border p-2">EndDate</th>
-                            <th className="border p-2">Status</th>
-                            <th className="border p-2">Actions</th>
+                            <th className="border p-2">Mã</th>
+                            <th className="border p-2">Giảm giá</th>
+                            <th className="border p-2">Áp dụng</th>
+                            <th className="border p-2">Ngày bắt đầu</th>
+                            <th className="border p-2">Ngày kết thúc</th>
+                            <th className="border p-2">Trạng thái</th>
+                            <th className="border p-2">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>

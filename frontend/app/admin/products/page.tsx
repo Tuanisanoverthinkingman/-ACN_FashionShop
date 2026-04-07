@@ -192,7 +192,7 @@ export default function ProductsPage() {
       ),
     },
     {
-      title: "Actions",
+      title: "Hành động",
       key: "actions",
       render: (_: any, record: Product) => (
         <Space>

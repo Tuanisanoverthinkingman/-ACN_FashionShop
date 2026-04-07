@@ -114,7 +114,7 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Quản lý Đơn hàng</h1>
+      <h1 className="text-xl font-bold mb-4">Quản lý đơn hàng</h1>
 
       {loading ? (
         <p>Đang tải...</p>
@@ -122,11 +122,11 @@ export default function AdminOrdersPage() {
         <table className="w-full border">
           <thead className="bg-gray-100">
             <tr>
-              <th className="border p-2">Order ID</th>
+              <th className="border p-2">Mã đơn hàng</th>
               <th className="border p-2">Tổng tiền</th>
               <th className="border p-2">Trạng thái</th>
               <th className="border p-2">Ngày</th>
-              <th className="border p-2">Actions</th>
+              <th className="border p-2">Hành động</th>
             </tr>
           </thead>
           <tbody>
