@@ -9,9 +9,7 @@ export default function PromoList() {
   const [loading, setLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<number | null>(null);
 
-  // ===============================
   // Fetch promotions
-  // ===============================
   useEffect(() => {
     const fetchPromos = async () => {
       setLoading(true);
@@ -41,9 +39,7 @@ export default function PromoList() {
     return () => window.removeEventListener("userChanged", handler);
   }, []);
 
-  // ===============================
   // Claim promotion
-  // ===============================
   const handleClaim = async (promotionId: number) => {
     setClaimingId(promotionId);
     try {
@@ -63,14 +59,12 @@ export default function PromoList() {
     }
   };
 
-  // ===============================
   // Render
-  // ===============================
   if (loading)
     return <p className="text-center py-4">Đang tải khuyến mãi...</p>;
 
   if (promos.length === 0)
-    return <p className="text-center py-4 text-gray-500">Không có mã giảm giá nào 😢</p>;
+    return <p className="text-center py-4 text-gray-500">Không có mã giảm giá nào </p>;
 
   return (
     <div className="flex gap-4 p-4 overflow-x-auto">

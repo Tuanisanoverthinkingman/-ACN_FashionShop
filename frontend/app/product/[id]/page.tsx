@@ -1,5 +1,6 @@
 "use client";
 
+import { orderByProduct } from "@/services/order-services";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getById, getByCategoryId, Product } from "@/services/product-services";
@@ -8,6 +9,7 @@ import { toast } from "react-toastify";
 import { FaShoppingCart } from "react-icons/fa";
 import Feedback from "@/components/FeedBack";
 import { Promotion, PromotionApplyType, getActivePromotions } from "@/services/promotion-services";
+import { FaMoneyBillWave } from "react-icons/fa";
 
 export default function ProductPage({ currentUserId, isAdmin }: { currentUserId: number; isAdmin?: boolean }) {
   const { id } = useParams();
@@ -25,7 +27,6 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       try {
         const data = await getById(Number(id));
         setProduct(data || null);
-
         if (data?.categoryId) {
           const relatedProducts = await getByCategoryId(data.categoryId);
           setRelated(relatedProducts?.filter(p => p.id !== data.id) || []);
@@ -73,6 +74,34 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       toast.error("Thêm vào giỏ hàng thất bại 😢");
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!product) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.warning("Cần đăng nhập để mua hàng");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      const res = await orderByProduct(product.id, 1);
+
+      toast.success("Mua ngay thành công 🎉");
+      router.push(`/checkout/${res.orderId}`);
+    } catch (err: any) {
+      console.error(err);
+
+      if (err.response?.status === 401) {
+        toast.warning("Phiên đăng nhập hết hạn, đăng nhập lại");
+        router.push("/login");
+        return;
+      }
+
+      toast.error(err.response?.data?.message || "Mua ngay thất bại");
     }
   };
 
@@ -125,6 +154,13 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
               <span className="flex-[1] bg-blue-400 text-white flex items-center justify-center">
                 <FaShoppingCart />
               </span>
+            </button>
+            <button
+              onClick={handleBuyNow}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+            >
+              <FaMoneyBillWave />
+              Mua ngay
             </button>
           </div>
         </div>

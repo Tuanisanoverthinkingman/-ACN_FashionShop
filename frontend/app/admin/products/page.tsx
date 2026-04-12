@@ -197,7 +197,7 @@ export default function ProductsPage() {
       render: (_: any, record: Product) => (
         <Space>
           <Button type="primary" size="small" onClick={() => handleEdit(record)}>
-            Edit
+            Sửa
           </Button>
           <Button
             type="primary"
@@ -205,7 +205,7 @@ export default function ProductsPage() {
             size="small"
             onClick={() => handleDelete(record.id)}
           >
-            Delete
+            Xoá
           </Button>
         </Space>
       ),
@@ -231,7 +231,7 @@ export default function ProductsPage() {
             setExcelFile(fileList[0]?.originFileObj || null);
           }}
         >
-          <Button icon={<UploadOutlined />}>Upload Excel</Button>
+          <Button icon={<UploadOutlined />}>Upload File Excel</Button>
         </Upload>
 
         <Button

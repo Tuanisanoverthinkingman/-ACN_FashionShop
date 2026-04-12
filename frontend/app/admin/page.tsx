@@ -14,9 +14,7 @@ import {
   getTopProducts,
 } from "@/services/report-services";
 
-/* ======================
-   TYPES
-====================== */
+/* TYPES */
 interface DashboardSummary {
   totalUsers: number;
   totalOrders: number;
@@ -24,9 +22,7 @@ interface DashboardSummary {
   totalProducts: number;
 }
 
-/* ======================
-   DEFAULT STATE
-====================== */
+/* DEFAULT STATE */
 const EMPTY_SUMMARY: DashboardSummary = {
   totalUsers: 0,
   totalOrders: 0,
@@ -63,9 +59,7 @@ export default function DashboardPage() {
     fetchDashboard();
   }, []);
 
-  /* ======================
-     LOADING
-  ====================== */
+  /* LOADING */
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[60vh]">
@@ -74,12 +68,10 @@ export default function DashboardPage() {
     );
   }
 
-  /* ======================
-     UI
-  ====================== */
+  /* UI */
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">📊 Admin Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-6">📊 Bảng điều khiển quản trị</h1>
 
       {/* SUMMARY */}
       <SummaryCards summary={summary} />

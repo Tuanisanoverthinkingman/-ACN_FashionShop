@@ -5,12 +5,12 @@ import { toast } from "react-toastify";
 export interface User {
   id: number;
   fullName: string;
-  username?: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  isActive?: boolean;
-  isVerified?: boolean;
+  username: string;
+  email: string;
+  phone: string;
+  role: string;
+  isActive: boolean;
+  isVerified: boolean;
 }
 
 // Lấy tất cả user

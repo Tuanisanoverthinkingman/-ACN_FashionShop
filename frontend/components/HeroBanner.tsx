@@ -1,114 +1,121 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { getAll, Product as ProductAPI } from "@/services/product-services";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
-
-interface ProductHero {
-  id: number;
-  name: string;
-  price: number;
-  imageUrl?: string | null;
-}
-
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price);
-
+// --- Skeleton: Đổi màu theo nền Sáng/Tối ---
 const HeroSkeleton = () => (
-  <section className="relative bg-gray-700 bg-center h-[85vh] animate-pulse font-[Times_New_Roman]">
-    <div className="absolute inset-0 bg-black/30"></div>
-    <div className="container mx-auto h-full flex flex-col justify-center items-start px-6 text-white relative z-10">
-      <div className="h-8 w-1/3 bg-gray-600 rounded-md"></div>
-      <div className="h-20 w-3/4 bg-gray-600 rounded-md mt-5 mb-8"></div>
-      <div className="h-10 w-1/4 bg-gray-600 rounded-md mb-6"></div>
-      <div className="h-14 w-48 bg-gray-600 rounded-lg"></div>
+  <section className="relative bg-white dark:bg-[#1a1814] h-[85vh] py-16 px-6 font-[Times_New_Roman] animate-pulse transition-colors duration-500">
+    <div className="max-w-7xl mx-auto h-full grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-gray-200 dark:bg-gray-700 rounded-lg aspect-[4/5] md:aspect-auto h-full"></div>
+      <div className="bg-gray-200 dark:bg-gray-700 rounded-lg aspect-[4/5] md:aspect-auto h-full"></div>
+      <div className="bg-gray-200 dark:bg-gray-700 rounded-lg aspect-[4/5] md:aspect-auto h-full"></div>
     </div>
   </section>
 );
 
-const SlideContent = ({ product, isActive }: { product: ProductHero; isActive: boolean }) => (
-  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 h-full w-[90%] flex flex-col justify-center px-6 md:px-12 text-white z-20">
-    <motion.span
-      className="text-xl md:text-2xl font-light tracking-wide text-shadow-md"
-      variants={{
-        hidden: { opacity: 0, y: -20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.7, delay: 0.3 } },
-      }}
-      initial="hidden"
-      animate={isActive ? "visible" : "hidden"}
-    >
-      Sản phẩm nổi bật ✨
-    </motion.span>
+// --- Component Video Card ---
+const VideoCard = ({ 
+  videoSrc, title, subtitle, linkPath 
+}: { 
+  videoSrc: string; title: string; subtitle: string; linkPath: string 
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
 
-    <motion.h2
-      className="text-3xl md:text-5xl font-extrabold mt-3 md:mt-5 mb-4 md:mb-6 text-shadow-lg"
-      variants={{
-        hidden: { opacity: 0, y: 30 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.9, delay: 0.5 } },
-      }}
-      initial="hidden"
-      animate={isActive ? "visible" : "hidden"}
-    >
-      {product.name}
-    </motion.h2>
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
-    <motion.p
-      className="text-2xl md:text-3xl font-semibold mb-6 text-shadow-md"
-      variants={{
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { duration: 0.9, delay: 0.8 } },
-      }}
-      initial="hidden"
-      animate={isActive ? "visible" : "hidden"}
-    >
-      {formatPrice(product.price)}
-    </motion.p>
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
 
-    <motion.div
-      variants={{
-        hidden: { opacity: 0, scale: 0.8 },
-        visible: { opacity: 1, scale: 1, transition: { duration: 0.7, delay: 1.0 } },
-      }}
-      initial="hidden"
-      animate={isActive ? "visible" : "hidden"}
-    >
-      <Link
-        href={`/product/${product.id}`}
-        className="inline-block text-base md:text-lg font-medium text-white border-2 border-white px-6 md:px-8 py-2 md:py-3 rounded-lg shadow-md hover:bg-white hover:text-black hover:shadow-lg transition-all duration-300"
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  if (!hasMounted) return <div className="aspect-[4/5] w-full bg-gray-200 dark:bg-gray-900 rounded-lg shadow-xl" />;
+
+  return (
+    <div className="relative aspect-[4/5] w-full rounded-lg overflow-hidden group bg-gray-200 dark:bg-gray-900 shadow-xl">
+      <video
+        ref={videoRef}
+        key={videoSrc}
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        autoPlay
+        loop
+        muted={isMuted}
+        playsInline
       >
-        🛍️ Xem chi tiết
-      </Link>
-    </motion.div>
-  </div>
-);
+        <source src={videoSrc} type="video/mp4" />
+        Trình duyệt của bạn không hỗ trợ video.
+      </video>
+      
+      {/* Lớp Overlay Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6 pb-14 text-center text-white z-20 pointer-events-none">
+        <h3 className="text-xl md:text-2xl font-medium text-shadow-md mb-2">{title}</h3>
+        <div className="flex justify-center pointer-events-auto">
+          <Link href={linkPath} className="text-sm md:text-base border-b-2 border-white pb-0.5 hover:text-gray-300 transition">
+            {subtitle}
+          </Link>
+        </div>
+      </div>
+
+      {/* --- CẬP NHẬT UI NÚT BẤM (FROSTED GLASS) --- */}
+      
+      {/* Nút Play/Pause */}
+      <div className="absolute bottom-4 left-4 z-30 pointer-events-auto">
+        <button 
+          onClick={togglePlay} 
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-white/80 hover:bg-white/40 backdrop-blur-md border border-white/10 text-white shadow-lg transition-all duration-300"
+        >
+          {isPlaying ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> 
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 
+          )}
+        </button>
+      </div>
+
+      {/* Nút Âm thanh */}
+      <div className="absolute bottom-4 right-4 z-30 pointer-events-auto">
+        <button 
+          onClick={toggleMute} 
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-white/80 hover:bg-white/40 backdrop-blur-md border border-white/10 text-white shadow-lg transition-all duration-300"
+        >
+          {isMuted ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="11" y1="5" x2="6" y2="9"></line><line x1="2" y1="9" x2="2" y2="15"></line><line x1="6" y1="15" x2="11" y2="19"></line><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg> 
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg> 
+          )}
+        </button>
+      </div>
+      
+    </div>
+  );
+};
 
 export default function HeroBanner() {
-  const [products, setProducts] = useState<ProductHero[]>([]);
+  const [products, setProducts] = useState<ProductAPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [leftInterval, setLeftInterval] = useState<number | null>(null);
-  const [rightInterval, setRightInterval] = useState<number | null>(null);
-  const swiperRef = useRef<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const data: ProductAPI[] | undefined = await getAll();
         if (data && data.length > 0) {
-          setProducts(
-            data.slice(0, 5).map((p) => ({
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              imageUrl: p.imageUrl || null,
-            }))
-          );
+          setProducts(data.slice(0, 3)); 
         }
       } catch (err) {
         console.error("Lỗi khi lấy sản phẩm:", err);
@@ -120,109 +127,64 @@ export default function HeroBanner() {
   }, []);
 
   if (isLoading) return <HeroSkeleton />;
-  if (products.length === 0) return null;
 
   return (
-    <section className="relative w-full h-[85vh] font-[Times_New_Roman]">
-      <Swiper
-        modules={[Navigation, Pagination, Autoplay]}
-        slidesPerView={1}
-        loop
-        autoplay={{ delay: 10000, disableOnInteraction: false }}
-        navigation
-        pagination={{ clickable: true }}
-        className="h-full relative"
-        onSwiper={(swiper) => (swiperRef.current = swiper)}
-      >
-        {products.map((product) => (
-          <SwiperSlide key={product.id} className="relative">
-            <img
-              src={product.imageUrl || "/images/banner/banner-01.jpg"}
-              alt={product.name}
-              className="absolute inset-0 w-full h-full object-cover"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-black/40 z-10"></div>
-            <SlideContent product={product} isActive={true} />
-          </SwiperSlide>
-        ))}
-      </Swiper>
+    // BƯỚC 1: Đổi màu nền bao ngoài (bg-white cho sáng, dark:bg-[#1a1814] cho tối)
+    <section className="relative w-full min-h-[85vh] bg-white dark:bg-[#1a1814] transition-colors duration-500 py-16 md:py-20 px-6 font-[Times_New_Roman] flex flex-col justify-center">
+      <div className="max-w-7xl mx-auto w-full">
+        
+        {/* Phần 1: Bố cục Grid 3 cột */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 md:mb-20 max-w-5xl mx-auto px-4 md:px-0">
+          <VideoCard 
+            videoSrc="/videos/Video1.mp4" 
+            title="Áo Khoác Chống Nắng UPF 50+" 
+            subtitle="Khám phá ngay" 
+            linkPath={`/product/${products[0]?.id || 1}`} 
+          />
+          <VideoCard 
+            videoSrc="/videos/Video2.mp4"
+            title="Mặc Mát - Chống Nắng" 
+            subtitle="Tay áo xỏ ngón che chắn" 
+            linkPath={`/product/${products[1]?.id || 2}`} 
+          />
+          <VideoCard 
+            videoSrc="/videos/Video3.mp4"
+            title="Bộ Sưu Tập Mùa Hè" 
+            subtitle="Xem tất cả" 
+            linkPath="/sale" 
+          />
+        </div>
 
-      {/* Hover area wrapper */}
-      <div className="absolute inset-0 z-50 pointer-events-none">
-        {/* Hover trái */}
-        <div
-          className="absolute left-0 top-0 h-full w-[5%] cursor-pointer hover:bg-black/20 pointer-events-auto"
-          onMouseEnter={() => {
-            if (leftInterval) window.clearInterval(leftInterval);
-            const interval = window.setInterval(() => swiperRef.current?.slidePrev(500), 1500);
-            setLeftInterval(interval);
-          }}
-          onMouseLeave={() => {
-            if (leftInterval) {
-              window.clearInterval(leftInterval);
-              setLeftInterval(null);
-            }
-          }}
-        ></div>
-
-        {/* Hover phải */}
-        <div
-          className="absolute right-0 top-0 h-full w-[5%] cursor-pointer hover:bg-black/20 pointer-events-auto"
-          onMouseEnter={() => {
-            if (rightInterval) window.clearInterval(rightInterval);
-            const interval = window.setInterval(() => swiperRef.current?.slideNext(500), 1500);
-            setRightInterval(interval);
-          }}
-          onMouseLeave={() => {
-            if (rightInterval) {
-              window.clearInterval(rightInterval);
-              setRightInterval(null);
-            }
-          }}
-        ></div>
+        {/* Phần 2: Text và Nút CTA bên dưới */}
+        <div className="text-center flex flex-col items-center">
+          
+          {/* TIÊU ĐỀ: Đen khi Sáng, Xám Trắng khi Tối */}
+          <h2 className="text-3xl md:text-4xl font-serif tracking-widest uppercase mb-4 transition-colors duration-500 text-gray-900 dark:text-[#e5e5e5]">
+            Mặc che chắn, không cháy nắng
+          </h2>
+          
+          {/* MÔ TẢ: Xám Đậm khi Sáng, Xám Nhạt khi Tối */}
+          <p className="text-base md:text-lg mb-10 max-w-2xl transition-colors duration-500 text-gray-600 dark:text-gray-400">
+            Mở bán siêu phẩm dành cho mùa hè
+          </p>
+          
+          {/* NÚT BẤM: Đổi màu nền và màu hover linh hoạt */}
+          <Link 
+            href="/sale"
+            className="text-white px-12 py-3.5 rounded-lg text-base font-medium shadow-md hover:shadow-lg transition-all duration-300 bg-gray-900 hover:bg-gray-800 dark:bg-[#242633] dark:hover:bg-[#323546]"
+          >
+            Săn ưu đãi ngay
+          </Link>
+          
+        </div>
       </div>
 
       <style jsx global>{`
         * {
           font-family: "Times New Roman", Times, serif !important;
         }
-        .swiper-button-next,
-        .swiper-button-prev {
-          color: #fff;
-          background-color: rgba(0, 0, 0, 0.2);
-          width: 35px;
-          height: 35px;
-          border-radius: 50%;
-          transition: all 0.3s;
-          z-index: 60;
-        }
-        .swiper-button-next:hover,
-        .swiper-button-prev:hover {
-          background-color: rgba(0, 0, 0, 0.4);
-        }
-        .swiper-button-next:after,
-        .swiper-button-prev:after {
-          font-size: 16px;
-          font-weight: 900;
-        }
-        .swiper-pagination-bullet {
-          background-color: #ccc;
-          opacity: 0.8;
-          width: 10px;
-          height: 10px;
-          transition: all 0.3s;
-        }
-        .swiper-pagination-bullet-active {
-          background-color: #fff;
-          opacity: 1;
-          transform: scale(1.2);
-        }
         .text-shadow-md {
           text-shadow: 1px 1px 6px rgba(0, 0, 0, 0.7);
-        }
-        .text-shadow-lg {
-          text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
         }
       `}</style>
     </section>

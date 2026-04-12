@@ -3,7 +3,6 @@
 import { ToastContainer } from "react-toastify";
 import NavBar from "./NavBar";
 import { usePathname } from "next/navigation";
-import "react-toastify/dist/ReactToastify.css";
 
 interface Props {
   children: React.ReactNode;

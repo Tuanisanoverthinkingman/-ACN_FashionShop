@@ -23,16 +23,12 @@ export interface UserPromotion {
   categoryIds: number[];
 }
 
-// ===============================
 // Error handler
-// ===============================
 const handleError = (error: any) => {
   toast.error(error.response?.data?.message || "Có lỗi xảy ra");
 };
 
-// ===============================
 // 1. Promo user đã claim
-// ===============================
 export const getMyPromotions = async (): Promise<UserPromotion[]> => {
   try {
     const res = await api.get("/api/user-promotions/my");
@@ -43,9 +39,7 @@ export const getMyPromotions = async (): Promise<UserPromotion[]> => {
   }
 };
 
-// ===============================
 // 2. Promo có thể dùng (checkout)
-// ===============================
 export const getAvailablePromotions = async (): Promise<UserPromotion[]> => {
   try {
     const res = await api.get("/api/user-promotions/available");
@@ -56,9 +50,7 @@ export const getAvailablePromotions = async (): Promise<UserPromotion[]> => {
   }
 };
 
-// ===============================
 // 3. Claim promotion
-// ===============================
 export const claimPromotion = async (promotionId: number) => {
   try {
     const res = await api.post(`/api/user-promotions/claim/${promotionId}`);
@@ -72,9 +64,7 @@ export const claimPromotion = async (promotionId: number) => {
   }
 };
 
-// ===============================
 // 4. Lấy promo áp dụng cho 1 product
-// ===============================
 export const getApplicablePromotionsForProduct = async (
   productId: number,
   categoryId?: number
@@ -101,9 +91,7 @@ export const getAllPromotionsForUser = async (): Promise<UserPromotion[]> => {
   }
 };
 
-// ===============================
 // 5. Check promo áp cho product
-// ===============================
 export const isPromoApplicable = (
   promo: UserPromotion,
   productId: number,

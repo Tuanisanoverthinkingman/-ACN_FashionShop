@@ -17,10 +17,8 @@ export const getOrderDetailsForAdmin = async (orderId: number) => {
 export const getOrderDetailsForUser = async (orderId: number) => {
   try {
     const res = await api.get(`/api/orderdetails/user/${orderId}`);
-    toast.success("Lấy chi tiết đơn hàng thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lấy chi tiết đơn hàng thất bại");
     throw error;
   }
 };

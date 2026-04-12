@@ -223,6 +223,22 @@ namespace Controllers
                 });
             }
         }
+        
+        // Lấy các đơn hàng đã có ít nhất 1 payment
+        [HttpGet("paid")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetPaidOrders()
+        {
+            var orders = await _context.orders
+                .Include(o => o.User)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(d => d.Product)
+                .Include(o => o.Payments)
+                .Where(o => o.Payments.Any())
+                .ToListAsync();
+
+            return Ok(new { message = "Lấy các đơn hàng đã mua thành công!", orders });
+        }
     }
     public class OrderByProductDto
     {

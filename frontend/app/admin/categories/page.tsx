@@ -93,7 +93,7 @@ export default function CategoriesPage() {
       render: (_: any, record: Category) => (
         <Space>
           <Button type="primary" size="small" onClick={() => handleEdit(record)}>
-            Edit
+            Sửa
           </Button>
           <Button
             type="primary"
@@ -101,7 +101,7 @@ export default function CategoriesPage() {
             size="small"
             onClick={() => handleDelete(record.id)}
           >
-            Delete
+            Xoá
           </Button>
         </Space>
       ),

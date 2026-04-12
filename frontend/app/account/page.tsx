@@ -27,7 +27,7 @@ export default function AccountPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ORDERS_PER_PAGE = 5;
 
-  // ---------------- FETCH USER ----------------
+  // FETCH USER 
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -47,7 +47,7 @@ export default function AccountPage() {
     fetchUser();
   }, []);
 
-  // ---------------- FETCH ORDERS ----------------
+  // FETCH ORDERS
   useEffect(() => {
     if (activeTab === "orders") {
       const fetchOrders = async () => {
@@ -62,7 +62,7 @@ export default function AccountPage() {
     }
   }, [activeTab]);
 
-  // ---------------- HANDLE UPDATE INFO ----------------
+  // HANDLE UPDATE INFO
   const handleUpdateInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -74,7 +74,7 @@ export default function AccountPage() {
     }
   };
 
-  // ---------------- HANDLE CHANGE PASSWORD ----------------
+  // HANDLE CHANGE PASSWORD
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {

@@ -312,19 +312,19 @@ export default function AdminPromotionsPage() {
                                         className="bg-yellow-500 text-white px-2 py-1 rounded"
                                         onClick={() => handleEdit(promo)}
                                     >
-                                        Edit
+                                        Sửa
                                     </button>
                                     <button
                                         className="bg-red-500 text-white px-2 py-1 rounded"
                                         onClick={() => handleDelete(promo.promotionId)}
                                     >
-                                        Delete
+                                        Xoá
                                     </button>
                                     <button
                                         className="bg-green-500 text-white px-2 py-1 rounded"
                                         onClick={() => handleToggleStatus(promo.promotionId)}
                                     >
-                                        Toggle
+                                        Bật/Tắt
                                     </button>
                                 </td>
                             </tr>

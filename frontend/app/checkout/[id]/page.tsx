@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getOrderDetailsForUser } from "@/services/orderdetail-services";
-import { createPayment } from "@/services/payment-services";
+import { createPayment, createVnPayUrl } from "@/services/payment-services";
 import {
   getMyPromotions,
   getApplicablePromotionsForProduct,
@@ -37,9 +37,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const numericOrderId = Number(params.id);
 
-  // ----------------------------
   // State & refs
-  // ----------------------------
   const [order, setOrder] = useState<Order | null>(null);
   const [autoPromotions, setAutoPromotions] = useState<UserPromotion[]>([]); // Product / Category
   const [genPromotions, setGenPromotions] = useState<UserPromotion[]>([]);   // GEN / User
@@ -50,10 +48,13 @@ export default function CheckoutPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // ----------------------------
   // Fetch order
-  // ----------------------------
+  const fetched = useRef(false);
+
   useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+
     if (isNaN(numericOrderId)) {
       toast.error("OrderId không hợp lệ");
       router.push("/cart");
@@ -64,6 +65,7 @@ export default function CheckoutPage() {
       try {
         const data = await getOrderDetailsForUser(numericOrderId);
         setOrder({ orderId: numericOrderId, orderDetails: data || [] });
+        toast.success("Lấy chi tiết đơn hàng thành công");
       } catch {
         toast.error("Không tìm thấy đơn hàng");
         router.push("/cart");
@@ -71,11 +73,9 @@ export default function CheckoutPage() {
     };
 
     fetchOrder();
-  }, [numericOrderId, router]);
+  }, [numericOrderId]);
 
-  // ----------------------------
   // Fetch promotions
-  // ----------------------------
   useEffect(() => {
     if (!order) return;
 
@@ -108,9 +108,7 @@ export default function CheckoutPage() {
     fetchPromos();
   }, [order]);
 
-  // ----------------------------
   // Filter applicable promotions
-  // ----------------------------
   const applicablePromotions = useMemo(() => {
     if (!order) return [];
     return [...autoPromotions, ...genPromotions].filter(p =>
@@ -120,9 +118,7 @@ export default function CheckoutPage() {
     );
   }, [order, autoPromotions, genPromotions]);
 
-  // ----------------------------
   // Product breakdown & total
-  // ----------------------------
   const productBreakdown = useMemo(() => {
     if (!order) return [];
 
@@ -145,10 +141,10 @@ export default function CheckoutPage() {
 
       const originalAmount = od.unitPrice * od.quantity;
       const discountedAmount = originalAmount * (1 - totalDiscount / 100);
-      console.log("OrderDetail:", od.productId, od.product?.categoryId);
-      autoPromotions.forEach(p => {
-        console.log("Promo:", p.promotionId, p.code, p.applyType, p.productIds, p.categoryIds);
-      });
+      // console.log("OrderDetail:", od.productId, od.product?.categoryId);
+      // autoPromotions.forEach(p => {
+      //   console.log("Promo:", p.promotionId, p.code, p.applyType, p.productIds, p.categoryIds);
+      // });
 
       return {
         productId: od.productId,
@@ -169,9 +165,7 @@ export default function CheckoutPage() {
   const totalOriginal = productBreakdown.reduce((sum, p) => sum + p.originalAmount, 0);
   const finalAmount = productBreakdown.reduce((sum, p) => sum + p.discountedAmount, 0);
 
-  // ----------------------------
   // Handle payment
-  // ----------------------------
   const handlePayment = async () => {
     if (!order) return;
     if (!address) return toast.error("Vui lòng nhập địa chỉ");
@@ -185,9 +179,30 @@ export default function CheckoutPage() {
       };
       if (promoId) payload.promoId = promoId;
 
-      await createPayment(payload);
+      // 1. Tạo payment
+      const payment = await createPayment(payload); // trả về object payment từ backend
       toast.success("Tạo payment thành công!");
-      router.push(`/order/${order.orderId}`);
+
+      const createdPaymentId = payment.payment?.paymentId;
+
+      // 2. Nếu phương thức VNPay, gọi create-vnpay và redirect
+      if (paymentMethod === "VNPAY") {
+        if (!createdPaymentId) {
+          toast.error("Không tìm thấy ID giao dịch để tạo link VNPay");
+          return;
+        }
+        const vnPayData = await createVnPayUrl(createdPaymentId);
+        if (vnPayData?.paymentUrl) {
+          window.location.href = vnPayData.paymentUrl; // redirect sang VNPay
+          return;
+        } else {
+          toast.error("Tạo link VNPay thất bại");
+        }
+      } else {
+        // Nếu COD hoặc Paypal redirect về order detail
+        router.push(`/order/${order.orderId}`);
+      }
+
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Thanh toán thất bại");
     } finally {
@@ -195,9 +210,7 @@ export default function CheckoutPage() {
     }
   };
 
-  // ----------------------------
   // Render
-  // ----------------------------
   if (!order) return <div className="pt-[90px] text-center mt-10">Đang tải đơn hàng...</div>;
 
   return (

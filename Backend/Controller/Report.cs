@@ -13,9 +13,7 @@ public class DashboardController : ControllerBase
         _context = context;
     }
 
-    // =========================
     // DASHBOARD TỔNG QUAN
-    // =========================
     [HttpGet("summary")]
     public IActionResult GetSummary()
     {
@@ -37,9 +35,7 @@ public class DashboardController : ControllerBase
         });
     }
 
-    // =========================
     // ĐƠN HÀNG THEO THÁNG (BIỂU ĐỒ)
-    // =========================
     [HttpGet("orders-by-month")]
     public IActionResult OrdersByMonth()
     {
@@ -62,9 +58,7 @@ public class DashboardController : ControllerBase
         return Ok(data);
     }
 
-    // =========================
     // ĐƠN HÀNG HÔM NAY
-    // =========================
     [HttpGet("orders-today")]
     public IActionResult OrdersToday()
     {
@@ -80,9 +74,7 @@ public class DashboardController : ControllerBase
         });
     }
 
-    // =========================
     // ĐƠN HÀNG TUẦN NÀY
-    // =========================
     [HttpGet("orders-this-week")]
     public IActionResult OrdersThisWeek()
     {
@@ -100,9 +92,7 @@ public class DashboardController : ControllerBase
         });
     }
 
-    // =========================
     // TOP 5 SẢN PHẨM BÁN CHẠY
-    // =========================
     [HttpGet("top-products")]
     public IActionResult TopProducts()
     {

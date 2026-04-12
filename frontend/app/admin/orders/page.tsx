@@ -145,7 +145,7 @@ export default function AdminOrdersPage() {
                     className="bg-blue-500 text-white px-2 py-1 rounded"
                     onClick={() => viewOrderDetails(o)}
                   >
-                    View
+                    Xem
                   </button>
 
 
@@ -163,7 +163,7 @@ export default function AdminOrdersPage() {
                       }
                     }}
                   >
-                    Delete
+                    Xoá
                   </button>
                 </td>
               </tr>

@@ -20,9 +20,7 @@ namespace Controllers
             _cache = cache;
         }
 
-        // ===============================
         // 1. Gửi OTP
-        // ===============================
         [HttpPost("send-otp")]
         public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
         {
@@ -70,9 +68,7 @@ namespace Controllers
             return Ok("OTP đã được gửi, kiểm tra email");
         }
 
-        // ===============================
         // 2. Xác thực OTP → tạo resetToken
-        // ===============================
         [HttpPost("verify-otp")]
         public IActionResult VerifyOtp([FromBody] VerifyOtpRequest request)
         {
@@ -92,9 +88,7 @@ namespace Controllers
             return Ok(new { message = "Xác thực OTP thành công", resetToken });
         }
 
-        // ===============================
         // 3. Reset password bằng resetToken
-        // ===============================
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
@@ -200,9 +194,7 @@ namespace Controllers
             return Ok("Xác thực tài khoản thành công 🎉");
         }
     }
-    // ===============================
     // Request models
-    // ===============================
     public class SendOtpRequest
     {
         public string EmailOrPhone { get; set; } = string.Empty;

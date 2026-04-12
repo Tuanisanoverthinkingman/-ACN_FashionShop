@@ -27,7 +27,7 @@ namespace Controllers
             _context = context;
         }
 
-        //Tạo mới người dùng (User)
+        // Tạo mới người dùng (User)
         [HttpPost("User")]
         public async Task<ActionResult<User>> CreateUser(
             [FromBody] CreateUserRequest request)
@@ -189,6 +189,12 @@ namespace Controllers
             if (user == null) return NotFound("Không tìm thấy người dùng.");
 
             user.IsActive = !user.IsActive;
+
+            if (user.IsActive == true)
+            {
+                user.IsVerified = true;
+            }
+
             await _context.SaveChangesAsync();
 
             string status = user.IsActive ? "kích hoạt" : "tạm xóa";

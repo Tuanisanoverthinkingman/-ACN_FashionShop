@@ -41,8 +41,6 @@ export const getOrderById = async (id: number) => {
 export const createOrder = async (cartItemIds: number[]) => {
   try {
     const res = await api.post("/api/Order", cartItemIds);
-
-    toast.success(res.data.message || "Tạo đơn hàng thành công");
     return res.data.order;
   } catch (error: any) {
     console.error(error);

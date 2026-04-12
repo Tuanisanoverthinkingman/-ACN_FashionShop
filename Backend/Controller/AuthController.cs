@@ -29,19 +29,21 @@ public class AuthController : Controller
         var user = await _context.users.FirstOrDefaultAsync(u => u.Username == request.Username);
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Password))
+        {
             return Unauthorized(new { message = "Sai tài khoản hoặc mật khẩu" });
+        }
 
         // Nếu đã gửi email nhưng hết hạn 24h
         if (!user.IsVerified &&
             user.EmailVerificationSentAt.HasValue &&
             user.EmailVerificationSentAt.Value.AddHours(24) < DateTime.UtcNow)
         {
-            user.IsActive = false;
-            await _context.SaveChangesAsync();
+            // user.IsActive = false;
+            // await _context.SaveChangesAsync();
 
             return BadRequest(new
             {
-                message = "Email chưa xác thực và đã hết hạn sau 24h. Vui lòng nhấn 'Gửi lại email xác thực'."
+                message = "Email chưa xác thực và đã hết hạn sau 24h. Vui lòng 'Gửi lại email xác thực'."
             });
         }
 

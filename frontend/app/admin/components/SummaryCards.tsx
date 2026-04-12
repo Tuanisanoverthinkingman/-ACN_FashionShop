@@ -11,22 +11,22 @@ export default function SummaryCards({ summary }: any) {
     <Row gutter={16}>
       <Col span={6}>
         <Card hoverable>
-          <Statistic title="Users" value={summary.totalUsers} prefix={<UserOutlined />} />
+          <Statistic title="Tổng người dùng" value={summary.totalUsers} prefix={<UserOutlined />} />
         </Card>
       </Col>
       <Col span={6}>
         <Card hoverable>
-          <Statistic title="Orders" value={summary.totalOrders} prefix={<ShoppingCartOutlined />} />
+          <Statistic title="Tổng hoá đơn" value={summary.totalOrders} prefix={<ShoppingCartOutlined />} />
         </Card>
       </Col>
       <Col span={6}>
         <Card hoverable>
-          <Statistic title="Revenue" value={summary.totalRevenue} prefix={<DollarOutlined />} />
+          <Statistic title="Doanh thu" value={summary.totalRevenue} prefix={<DollarOutlined />} />
         </Card>
       </Col>
       <Col span={6}>
         <Card hoverable>
-          <Statistic title="Products" value={summary.totalProducts} prefix={<AppstoreOutlined />} />
+          <Statistic title="Tổng sản phẩm" value={summary.totalProducts} prefix={<AppstoreOutlined />} />
         </Card>
       </Col>
     </Row>

@@ -5,9 +5,8 @@ import { Layout, Menu, Button } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import { label } from "framer-motion/client";
-import "antd/dist/reset.css";
+
 
 const { Header, Content, Sider } = Layout;
 
@@ -52,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <Layout style={{ minHeight: "100vh" }}>
       <Sider>
         <div style={{ color: "white", padding: 16, textAlign: "center", fontSize: 20 }}>
-          Admin Panel
+          BẢNG QUẢN TRỊ
         </div>
         <Menu theme="dark" mode="inline" defaultSelectedKeys={["1"]} items={menuItems} />
       </Sider>
@@ -72,9 +71,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
           }}
         >
-          <div>Welcome Admin!</div>
+          <div>Chào mừng quản trị viên!</div>
           <Button type="primary" danger onClick={handleLogout}>
-            Logout
+            Đăng xuất
           </Button>
         </Header>
 

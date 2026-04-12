@@ -2,28 +2,26 @@
 
 import React, { useEffect, useState } from "react";
 import { Table, Button, Space } from "antd";
-import { getAllUsers, updateIsActive } from "@/services/user-services";
+import { getAllUsers, updateIsActive, User } from "@/services/user-services";
 import { toast } from "react-toastify";
-
-interface User {
-    id: number;
-    username: string;
-    fullName: string;
-    email: string;
-    phone: string;
-    role: string;
-    isActive: boolean;
-}
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchText, setSearchText] = useState("");
+
+    const filteredUsers = users.filter(user =>
+        user.username.toLowerCase().includes(searchText.toLowerCase()) ||
+        user.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchText.toLowerCase()) ||
+        user.phone.toLowerCase().includes(searchText.toLowerCase())
+    );
 
     const fetchUsers = async () => {
         setLoading(true);
         try {
             const data = await getAllUsers();
-            if (data) setUsers(data);
+            if (data) setUsers(data.reverse());
         } catch (err: any) {
             toast.error("Lấy danh sách user thất bại!");
         } finally {
@@ -82,9 +80,16 @@ export default function UsersPage() {
     return (
         <div>
             <h1 className="text-2xl font-bold mb-4">Quản lý người dùng</h1>
+            <input
+                type="text"
+                placeholder="Tìm kiếm người dùng..."
+                className="border rounded px-2 py-1 mb-4 w-full"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+            />
             <Table
                 rowKey="id"
-                dataSource={users}
+                dataSource={filteredUsers}
                 columns={columns}
                 loading={loading}
                 bordered

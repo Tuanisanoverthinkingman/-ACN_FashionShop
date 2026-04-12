@@ -88,7 +88,7 @@ namespace Controllers
             if (category == null)
                 return NotFound(new { message = "Danh mục không tồn tại." });
 
-            // 🔴 KIỂM TRA CATEGORY CÓ PRODUCT KHÔNG
+            // KIỂM TRA CATEGORY CÓ PRODUCT KHÔNG
             bool hasProducts = await _context.products
                 .AnyAsync(p => p.CategoryId == id);
 

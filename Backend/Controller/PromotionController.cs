@@ -16,9 +16,7 @@ namespace Controllers
             _context = context;
         }
 
-        // =========================
         // 1. ADMIN - Tạo promotion
-        // =========================
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] PromotionRequest request)
@@ -36,7 +34,7 @@ namespace Controllers
             if (validateResult != null)
                 return validateResult;
 
-            // --- Check nếu ApplyType là Product hoặc Category, tránh trùng sản phẩm/danh mục ---
+            // Check nếu ApplyType là Product hoặc Category, tránh trùng sản phẩm/danh mục ---
             if (request.ApplyType == PromotionApplyType.Product)
             {
                 var existingPromo = await _context.promotions
@@ -81,7 +79,7 @@ namespace Controllers
                 }
             }
 
-            // --- Nếu không trùng, tạo mới promotion ---
+            // Nếu không trùng, tạo mới promotion
             var promo = new Promotion
             {
                 Code = request.Code,
@@ -102,9 +100,7 @@ namespace Controllers
             return Ok(new { message = "Tạo promotion thành công" });
         }
 
-        // =========================
         // 2. ADMIN - Lấy tất cả promotion
-        // =========================
         [HttpGet("admin")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllForAdmin()
@@ -119,9 +115,7 @@ namespace Controllers
             return Ok(promos);
         }
 
-        // =========================
         // 3. ADMIN - Lấy chi tiết promotion
-        // =========================
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -137,9 +131,7 @@ namespace Controllers
             return Ok(promo);
         }
 
-        // =========================
         // 4. ADMIN - Cập nhật promotion
-        // =========================
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] PromotionRequest request)
@@ -182,9 +174,7 @@ namespace Controllers
             return Ok(new { message = "Cập nhật promotion thành công" });
         }
 
-        // =========================
         // 5. ADMIN - Xoá promotion
-        // =========================
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
@@ -204,9 +194,7 @@ namespace Controllers
             return Ok(new { message = "Xoá promotion thành công" });
         }
 
-        // =========================
         // 6. ADMIN - Bật / tắt promotion
-        // =========================
         [HttpPut("{id}/status")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ToggleStatus(int id)
@@ -232,9 +220,7 @@ namespace Controllers
             });
         }
 
-        // =========================
         // 7. PUBLIC - Lấy promotion active (KHÔNG BAO GỒM USER)
-        // =========================
         [HttpGet]
         public async Task<IActionResult> GetActivePromotions()
         {
@@ -271,9 +257,7 @@ namespace Controllers
             return Ok(result);
         }
 
-        // =========================
         // PUBLIC - Lấy promotion có thể claim (General)
-        // =========================
         [HttpGet("claimable")]
         public async Task<IActionResult> GetClaimablePromotions()
         {
@@ -302,9 +286,7 @@ namespace Controllers
             return Ok(result);
         }
 
-        // =========================
         // HELPER METHODS
-        // =========================
         private IActionResult? ValidateApplyType(PromotionRequest request)
         {
             return request.ApplyType switch
@@ -350,9 +332,7 @@ namespace Controllers
             }
         }
 
-        // =========================
         // DEV/TEST - Tạo fake promotions 2 cái mỗi loại (Product, Category, User, General)
-        // =========================
         [HttpPost("fake")]
         public async Task<IActionResult> CreateFakePromotions()
         {
@@ -380,7 +360,7 @@ namespace Controllers
                 });
             }
 
-            // --- Category (2 cái) ---
+            // Category (2 cái)
             for (int i = 1; i <= 2; i++)
             {
                 fakePromos.Add(new Promotion
@@ -425,7 +405,7 @@ namespace Controllers
                 }
             }
 
-            // --- General (2 cái) ---
+            // General (2 cái)
             for (int i = 1; i <= 2; i++)
             {
                 fakePromos.Add(new Promotion
@@ -468,9 +448,8 @@ namespace Controllers
             });
         }
     }
-    // =========================
+    
     // REQUEST DTO
-    // =========================
     public class PromotionRequest
     {
         public string Code { get; set; } = null!;

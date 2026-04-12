@@ -1,9 +1,7 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
-// ===============================
 // Gửi OTP
-// ===============================
 export const sendOtp = async (email: string) => {
   try {
     const res = await api.post("/api/EmailAndOTP/send-otp", {
@@ -18,9 +16,7 @@ export const sendOtp = async (email: string) => {
   }
 };
 
-// ===============================
 // Xác thực OTP → nhận resetToken
-// ===============================
 export const verifyOtp = async (email: string, otp: string) => {
   try {
     const res = await api.post("/api/EmailAndOTP/verify-otp", {
@@ -35,9 +31,7 @@ export const verifyOtp = async (email: string, otp: string) => {
   }
 };
 
-// ===============================
 // Reset password bằng resetToken
-// ===============================
 export const resetPasswordWithToken = async (
   email: string,
   resetToken: string,
@@ -57,9 +51,7 @@ export const resetPasswordWithToken = async (
   }
 };
 
-// ===============================
 // Gửi email xác thực tài khoản
-// ===============================
 export const sendVerificationEmail = async (email: string) => {
   try {
     const res = await api.post("/api/EmailAndOTP/send-verification-email", {
@@ -73,9 +65,7 @@ export const sendVerificationEmail = async (email: string) => {
   }
 };
 
-// ===============================
 // Xác thực email token
-// ===============================
 export const verifyEmailToken = async (email: string, token: string) => {
   try {
     const res = await api.post("/api/EmailAndOTP/verify-email", {

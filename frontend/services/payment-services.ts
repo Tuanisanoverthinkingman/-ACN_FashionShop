@@ -1,10 +1,9 @@
 import api from "./api";
 import { toast } from "react-toastify";
+import { NextRequest, NextResponse } from "next/server";
 
-// ===============================
 // ADMIN – All payments
 // GET /api/Payment/all
-// ===============================
 export const getAllPayments = async () => {
   try {
     const res = await api.get("/api/Payment/all");
@@ -15,9 +14,7 @@ export const getAllPayments = async () => {
   }
 };
 
-// ===============================
 // USER – My payments
-// ===============================
 export const getMyPayments = async () => {
   try {
     const res = await api.get("/api/Payment/user");
@@ -28,9 +25,7 @@ export const getMyPayments = async () => {
   }
 };
 
-// ===============================
 // Get payment by ID
-// ===============================
 export const getPaymentById = async (id: number) => {
   try {
     const res = await api.get(`/api/Payment/${id}`);
@@ -41,9 +36,7 @@ export const getPaymentById = async (id: number) => {
   }
 };
 
-// ===============================
 // Get latest payment by OrderId
-// ===============================
 export const getPaymentByOrderId = async (orderId: number) => {
   try {
     const res = await api.get(`/api/Payment/order/${orderId}`);
@@ -54,9 +47,7 @@ export const getPaymentByOrderId = async (orderId: number) => {
   }
 };
 
-// ===============================
 // Create payment
-// ===============================
 export const createPayment = async (data: {
   orderId: number;
   promoId?: number;
@@ -73,9 +64,7 @@ export const createPayment = async (data: {
   }
 };
 
-// ===============================
 // Retry payment
-// ===============================
 export const retryPayment = async (paymentId: number) => {
   try {
     const res = await api.post(`/api/Payment/retry/${paymentId}`);
@@ -87,9 +76,7 @@ export const retryPayment = async (paymentId: number) => {
   }
 };
 
-// ===============================
 // Cancel payment
-// ===============================
 export const cancelPayment = async (paymentId: number) => {
   try {
     const res = await api.post(`/api/Payment/cancel/${paymentId}`);
@@ -101,9 +88,7 @@ export const cancelPayment = async (paymentId: number) => {
   }
 };
 
-// ===============================
 // ADMIN – Update payment status
-// ===============================
 export const updatePaymentStatus = async (
   id: number,
   newStatus: string
@@ -118,6 +103,17 @@ export const updatePaymentStatus = async (
     return res.data;
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Cập nhật trạng thái thất bại");
+    throw error;
+  }
+};
+
+export const createVnPayUrl = async (paymentId: number) => {
+  try {
+    // Gọi thẳng vào API route của C# backend
+    const res = await api.post(`/api/Payment/create-vnpay/${paymentId}`);
+    return res.data;
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Tạo link thanh toán VNPay thất bại");
     throw error;
   }
 };

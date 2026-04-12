@@ -7,9 +7,9 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import { getAllCategories, Category } from "@/services/category-services";
 import { getAll as getProducts, Product } from "@/services/product-services";
 
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
+  import "swiper/css";
+  import "swiper/css/navigation";
+  import "swiper/css/pagination";
 
 export default function CategoryBanner() {
   const [categories, setCategories] = useState<Category[]>([]);

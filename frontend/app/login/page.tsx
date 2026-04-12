@@ -51,7 +51,7 @@ export default function LoginPage() {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            placeholder="Nhập username..."
+                            placeholder="Nhập tài khoản..."
                             className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
                         />
                     </div>
@@ -68,7 +68,7 @@ export default function LoginPage() {
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-[38px] text-gray-400 hover:text-gray-600 transition"
+                            className="absolute right-3 top-[44px] text-gray-400 hover:text-gray-600 transition"
                         >
                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                         </button>
