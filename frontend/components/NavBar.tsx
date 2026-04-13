@@ -10,9 +10,9 @@ import { logout } from "@/services/auth-services";
 // --- Danh sách Menu ---
 const NAV_MENU = [
   { name: "SALE", path: "/sale", hasDropdown: true },
-  { name: "ÁO", path: "/category/ao", hasDropdown: true },
-  { name: "QUẦN", path: "/category/quan", hasDropdown: true },
-  { name: "PHỤ KIỆN", path: "/category/phu-kien", hasDropdown: true },
+  { name: "ÁO", path: "/collections/ao", hasDropdown: true },
+  { name: "QUẦN", path: "/collections/quan", hasDropdown: true },
+  { name: "PHỤ KIỆN", path: "/collections/phu-kien", hasDropdown: true },
 ];
 
 // --- Hook kiểm tra user ---
@@ -126,6 +126,77 @@ export default function NavBar() {
                   <ChevronDown size={14} className="group-hover:rotate-180 transition-transform duration-300" />
                 )}
               </Link>
+
+              {/* ======================= MEGA MENU: SALE ======================= */}
+              {item.name === "SALE" && (
+                <div className={`absolute left-0 top-full mt-1 w-[320px] border transition-all duration-300 z-50 cursor-default opacity-0 invisible group-hover:opacity-100 group-hover:visible ${megaMenuClass}`}>
+                  <div className="p-5 flex flex-col gap-6">
+                    
+                    {/* Nhóm 1: Quần Áo */}
+                    <div>
+                      <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
+                        Sale Quần Áo
+                      </h4>
+                      <ul className="space-y-3">
+                        <li>
+                          <Link href="/sale/ao-thun" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Sale Áo Thun
+                          </Link>
+                        </li>
+                        <li>
+                          <Link href="/sale/ao-so-mi" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Sale Áo Sơ Mi
+                          </Link>
+                        </li>
+                        <li>
+                          <Link href="/sale/ao-khoac" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Sale Áo Khoác
+                          </Link>
+                        </li>
+                        <li>
+                          <Link href="/sale/quan-dai" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Sale Quần Dài
+                          </Link>
+                        </li>
+                        <li>
+                          <Link href="/sale/quan-short" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Sale Quần Short
+                          </Link>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Nhóm 2: Phụ kiện */}
+                    <div>
+                      <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
+                        Sale Phụ Kiện
+                      </h4>
+                      <ul className="space-y-3">
+                        <li>
+                          <Link href="/sale/phu-kien" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Balo, Nón, Ví, Dây Nịt...
+                          </Link>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Nhóm 3: Giá Đặc Biệt */}
+                    <div>
+                      <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
+                        Giá Đặc Biệt
+                      </h4>
+                      <ul className="space-y-3">
+                        <li>
+                          <Link href="/sale/gia-dac-biet" className={`text-sm transition-colors duration-200 flex items-center gap-2 ${linkClass}`}>
+                            <span className="text-[10px] opacity-40 font-mono">&gt;</span> Đồ Dùng Tiện Ích
+                          </Link>
+                        </li>
+                      </ul>
+                    </div>
+
+                  </div>
+                </div>
+              )}
 
               {/* ======================= MEGA MENU: ÁO ======================= */}
               {item.name === "ÁO" && (
@@ -259,8 +330,8 @@ export default function NavBar() {
                         Túi Đeo Chéo & Túi Xách
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/9" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Đeo Chéo (Cross Bag)</Link></li>
-                        <li><Link href="/category/40" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Bao Tử (Hip Sack)</Link></li>
+                        <li><Link href="/category/9" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Đeo Chéo</Link></li>
+                        <li><Link href="/category/40" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Bao Tử</Link></li>
                         <li><Link href="/category/7" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Tote</Link></li>
                       </ul>
                     </div>

@@ -26,110 +26,120 @@ namespace Controllers
         [HttpGet("fetch-products")]
         public async Task<IActionResult> FetchProducts()
         {
-            // Tham số ?limit=250 để lấy 250 sản phẩm một lần
-            string url = "https://yame.vn/products.json?limit=250";
-
             try
             {
-                var response = await _httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
-                    return StatusCode((int)response.StatusCode, "Failed to fetch data");
-
-                var content = await response.Content.ReadAsStringAsync();
-                var json = JObject.Parse(content);
-                var productsArray = json["products"] as JArray;
-
-                if (productsArray == null || !productsArray.Any())
-                    return BadRequest("No products found in JSON");
-
-                // BƯỚC 1: XỬ LÝ HÀNG LOẠT DANH MỤC (Tránh N+1)
-                // Quét 1 lượt lấy tất cả tên danh mục có trong JSON
-                var jsonCategoryNames = productsArray
-                    .Select(p => p["product_type"]?.ToString())
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Distinct()
-                    .ToList();
-
-                // Lấy các danh mục ĐÃ CÓ trong DB
-                var existingCategories = await _context.categories
-                    .Where(c => jsonCategoryNames.Contains(c.Name))
-                    .ToListAsync();
-
+                // Kéo danh sách category và product hiện có lên RAM (CHỈ 1 LẦN TRƯỚC VÒNG LẶP)
+                var existingCategories = await _context.categories.ToListAsync();
+                var categoryDict = existingCategories.ToDictionary(c => c.Name, c => c.Id);
                 var existingCategoryNames = existingCategories.Select(c => c.Name).ToHashSet();
 
-                // Lọc ra các danh mục MỚI TINH chưa có trong DB
-                var newCategories = jsonCategoryNames
-                    .Where(name => !existingCategoryNames.Contains(name))
-                    .Select(name => new Category { Name = name, Description = name })
-                    .ToList();
-
-                // Lưu các danh mục mới 1 lần duy nhất
-                if (newCategories.Any())
-                {
-                    _context.categories.AddRange(newCategories);
-                    await _context.SaveChangesAsync(); 
-                    existingCategories.AddRange(newCategories); // Gộp chung vào list để lát tra cứu ID
-                }
-
-                // Biến danh sách thành Dictionary để vòng lặp tra cứu ID với tốc độ cực nhanh (O(1))
-                var categoryDict = existingCategories.ToDictionary(c => c.Name, c => c.Id);
-
-                // BƯỚC 2: CHUẨN BỊ DỮ LIỆU ĐỂ LỌC TRÙNG SẢN PHẨM
-                // Tải tất cả TÊN sản phẩm đang có trong DB lên RAM (Dùng HashSet để kiểm tra trùng lặp siêu tốc)
-                var existingProductNames = await _context.products
-                    .Select(p => p.Name)
-                    .ToHashSetAsync(); 
-
+                var existingProductNames = await _context.products.Select(p => p.Name).ToHashSetAsync();
                 var newProducts = new List<Product>();
 
-                // BƯỚC 3: DỰNG DATA SẢN PHẨM Ở BỘ NHỚ TẠM
-                foreach (var item in productsArray)
+                int page = 1;
+                int totalFetched = 0;
+                bool hasMoreData = true;
+
+                // Vòng lặp cào từng trang
+                while (hasMoreData && totalFetched < 1400) // Giới hạn lấy 1400 sản phẩm
                 {
-                    string productName = item["title"]?.ToString() ?? "No Name";
+                    // Thêm tham số page vào URL
+                    string url = $"https://yame.vn/products.json?limit=250&page={page}";
 
-                    // Check trùng lặp ngay trên RAM, KHÔNG chọc vào DB nữa
-                    if (existingProductNames.Contains(productName))
-                        continue;
-
-                    string categoryName = item["product_type"]?.ToString() ?? "Khác";
-                    int categoryId = categoryDict.TryGetValue(categoryName, out int id) ? id : existingCategories.First().Id;
-
-                    var firstVariant = item["variants"]?[0];
-                    var firstImage = item["images"]?[0];
-
-                    string html = item["body_html"]?.ToString() ?? "";
-                    var doc = new HtmlDocument();
-                    doc.LoadHtml(html);
-                    string plainDescription = doc.DocumentNode.InnerText;
-
-                    if (plainDescription.Length > 4000)
-                        plainDescription = plainDescription.Substring(0, 4000);
-
-                    // TỐI ƯU 2: Dùng Random.Shared hiệu năng cao hơn thay vì khởi tạo new Random() liên tục
-                    int stock = Random.Shared.Next(50, 201);
-
-                    var product = new Product
+                    var response = await _httpClient.GetAsync(url);
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Name = productName,
-                        Description = plainDescription,
-                        Price = decimal.TryParse(firstVariant?["price"]?.ToString(), out var price) ? price : 0,
-                        Instock = stock,
-                        ImageUrl = firstImage?["src"]?.ToString(),
-                        CategoryId = categoryId
-                    };
+                        // Nếu lỗi ở trang đầu thì báo lỗi, nếu ở trang sau thì thoát vòng lặp
+                        if (page == 1) return StatusCode((int)response.StatusCode, "Failed to fetch data");
+                        break;
+                    }
 
-                    newProducts.Add(product);
-                    existingProductNames.Add(productName); // Thêm vào list tạm đề phòng chính trong file JSON có 2 áo trùng tên
+                    var content = await response.Content.ReadAsStringAsync();
+                    var json = JObject.Parse(content);
+                    var productsArray = json["products"] as JArray;
+
+                    // Nếu mảng rỗng -> Đã cào đến trang cuối cùng -> Thoát vòng lặp
+                    if (productsArray == null || !productsArray.Any())
+                    {
+                        hasMoreData = false;
+                        break;
+                    }
+
+                    // XỬ LÝ DANH MỤC MỚI TRONG TRANG NÀY
+                    var jsonCategoryNames = productsArray
+                        .Select(p => p["product_type"]?.ToString())
+                        .Where(name => !string.IsNullOrEmpty(name))
+                        .Distinct()
+                        .ToList();
+
+                    var newCategoriesThisPage = jsonCategoryNames
+                        .Where(name => !existingCategoryNames.Contains(name))
+                        .Select(name => new Category { Name = name, Description = name })
+                        .ToList();
+
+                    if (newCategoriesThisPage.Any())
+                    {
+                        _context.categories.AddRange(newCategoriesThisPage);
+                        await _context.SaveChangesAsync();
+
+                        foreach (var cat in newCategoriesThisPage)
+                        {
+                            categoryDict[cat.Name] = cat.Id;
+                            existingCategoryNames.Add(cat.Name);
+                        }
+                    }
+
+                    // DỰNG DATA SẢN PHẨM Ở BỘ NHỚ TẠM
+                    foreach (var item in productsArray)
+                    {
+                        string productName = item["title"]?.ToString() ?? "No Name";
+
+                        if (existingProductNames.Contains(productName))
+                            continue;
+
+                        string categoryName = item["product_type"]?.ToString() ?? "Khác";
+                        int categoryId = categoryDict.TryGetValue(categoryName, out int id) ? id : existingCategories.FirstOrDefault()?.Id ?? 0;
+
+                        var firstVariant = item["variants"]?[0];
+                        var firstImage = item["images"]?[0];
+
+                        string html = item["body_html"]?.ToString() ?? "";
+                        var doc = new HtmlDocument();
+                        doc.LoadHtml(html);
+                        string plainDescription = doc.DocumentNode.InnerText;
+
+                        if (plainDescription.Length > 4000)
+                            plainDescription = plainDescription.Substring(0, 4000);
+
+                        var product = new Product
+                        {
+                            Name = productName,
+                            Description = plainDescription,
+                            Price = decimal.TryParse(firstVariant?["price"]?.ToString(), out var price) ? price : 0,
+                            Instock = Random.Shared.Next(50, 201),
+                            ImageUrl = firstImage?["src"]?.ToString(),
+                            CategoryId = categoryId
+                        };
+
+                        newProducts.Add(product);
+                        existingProductNames.Add(productName);
+                    }
+
+                    totalFetched += productsArray.Count;
+                    page++; // Chuyển sang trang tiếp theo
+
+                    // Nghỉ 1 chút giữa các request để tránh bị server block (Polite Scraping)
+                    await Task.Delay(500);
                 }
 
-                // BƯỚC 4: NHẬP KHO HÀNG LOẠT (Bulk Insert)
+                // NHẬP KHO HÀNG LOẠT (Bulk Insert)
                 if (newProducts.Any())
                 {
                     _context.products.AddRange(newProducts);
-                    await _context.SaveChangesAsync(); // Chỉ gọi DB 1 LẦN CUỐI CÙNG
+                    await _context.SaveChangesAsync();
                 }
 
-                return Ok(new { message = $"Thành công! Đã cào và lưu thêm {newProducts.Count} sản phẩm mới." });
+                return Ok(new { message = $"Thành công! Đã quét {totalFetched} SP từ nguồn, lưu mới {newProducts.Count} sản phẩm." });
             }
             catch (Exception ex)
             {

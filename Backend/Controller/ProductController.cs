@@ -175,7 +175,6 @@ namespace Controllers
             }
             catch (Exception ex)
             {
-                // 🔥 LOG LỖI 
                 Console.WriteLine("===== UPLOAD EXCEL FATAL ERROR =====");
                 Console.WriteLine(ex.ToString());
                 Console.WriteLine("===================================");
@@ -258,6 +257,94 @@ namespace Controllers
 
             if (products == null || !products.Any())
                 return NotFound(new { message = "Không tìm thấy sản phẩm nào trong nhóm này." });
+
+            return Ok(products);
+        }
+
+        //Lấy danh sách sản phẩm theo từ khoá danh mục (ÁO, QUẦN, PHỤ KIỆN)
+        [HttpGet("group/{keyword}")]
+        public async Task<IActionResult> GetByCategoryGroup(string keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+                return BadRequest(new { message = "Từ khoá không hợp lệ." });
+
+            string searchTerm = keyword.ToLower().Trim();
+
+            // Xử lý mapping từ URL không dấu (của Frontend) sang Tiếng Việt có dấu (trong Database)
+            if (searchTerm == "ao") searchTerm = "áo";
+            else if (searchTerm == "quan") searchTerm = "quần";
+            else if (searchTerm == "phu-kien" || searchTerm == "phukien") searchTerm = "phụ kiện";
+
+            // Tìm tất cả sản phẩm mà tên Danh mục của nó có chứa từ khoá (Ví dụ: chứa chữ "áo")
+            var products = await _context.products
+                .Include(p => p.Category)
+                .Where(p => p.Category != null && p.Category.Name.ToLower().Contains(searchTerm))
+                .OrderByDescending(p => p.Id)
+                .ToListAsync();
+
+            // Nếu không có, nên trả về mảng rỗng [] cùng status 200 OK để Frontend dùng hàm .map() không bị lỗi crash app
+            return Ok(products);
+        }
+
+        // Lấy danh sách sản phẩm ĐANG SALE (có thể lọc thêm theo nhóm danh mục)
+        // Dùng cho trang /sale và /sale/{keyword}
+        [HttpGet("on-sale/{keyword?}")]
+        public async Task<IActionResult> GetSaleProducts(string? keyword = null)
+        {
+            var now = DateTime.UtcNow;
+
+            // 1. Lấy danh sách ID của Sản phẩm và Danh mục đang được áp dụng khuyến mãi
+            var activePromos = await _context.promotions
+                .Include(p => p.PromotionProducts)
+                .Include(p => p.PromotionCategories)
+                .Where(p => p.Status == PromotionStatus.Active &&
+                            p.StartDate <= now &&
+                            p.EndDate >= now &&
+                            p.ApplyType != PromotionApplyType.User) // Bỏ qua promo của cá nhân
+                .ToListAsync();
+
+            var onSaleProductIds = activePromos.SelectMany(p => p.PromotionProducts.Select(pp => pp.ProductId)).Distinct().ToList();
+            var onSaleCategoryIds = activePromos.SelectMany(p => p.PromotionCategories.Select(pc => pc.CategoryId)).Distinct().ToList();
+
+            // Lấy xem có khuyến mãi General không (nếu General là giảm toàn shop)
+            bool hasGeneralPromo = activePromos.Any(p => p.ApplyType == PromotionApplyType.General);
+
+            // 2. Bắt đầu query Sản phẩm
+            var query = _context.products.Include(p => p.Category).AsQueryable();
+
+            // Nếu không có General Promo, thì chỉ lấy những sản phẩm nằm trong danh sách giảm giá
+            if (!hasGeneralPromo)
+            {
+                query = query.Where(p => onSaleProductIds.Contains(p.Id) || onSaleCategoryIds.Contains(p.CategoryId));
+            }
+
+            // 3. Nếu người dùng chọn menu cụ thể (Ví dụ: /sale/ao-thun, /sale/quan-dai)
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                string searchTerm = keyword.ToLower().Trim();
+
+                // Xử lý các keyword từ Mega Menu của bạn
+                if (searchTerm == "quan-ao") searchTerm = "áo|quần"; // Mẹo lấy cả 2
+                else if (searchTerm == "ao-thun") searchTerm = "áo thun";
+                else if (searchTerm == "ao-so-mi") searchTerm = "áo sơ mi";
+                else if (searchTerm == "ao-khoac") searchTerm = "áo khoác";
+                else if (searchTerm == "quan-dai") searchTerm = "quần dài"; // Có thể query Kaki, Tây, Jogger
+                else if (searchTerm == "quan-short") searchTerm = "quần short";
+                else if (searchTerm == "phu-kien") searchTerm = "phụ kiện";
+
+                // Nếu là "quan-ao", ta tìm chữ áo hoặc quần
+                if (searchTerm == "áo|quần")
+                {
+                    query = query.Where(p => p.Category != null &&
+                        (p.Category.Name.ToLower().Contains("áo") || p.Category.Name.ToLower().Contains("quần")));
+                }
+                else
+                {
+                    query = query.Where(p => p.Category != null && p.Category.Name.ToLower().Contains(searchTerm));
+                }
+            }
+
+            var products = await query.OrderByDescending(p => p.Id).ToListAsync();
 
             return Ok(products);
         }

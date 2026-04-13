@@ -100,6 +100,28 @@ export default function ProductBanner() {
     }
   };
 
+  const getPageNumbers = () => {
+    const maxVisiblePages = 5; // Số lượng trang hiển thị tối đa ở giữa
+    const pages = [];
+
+    if (totalPages <= maxVisiblePages + 2) {
+      // Nếu tổng số trang ít, hiển thị tất cả
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        // Đang ở những trang đầu
+        pages.push(1, 2, 3, 4, 5, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        // Đang ở những trang cuối
+        pages.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        // Đang ở giữa
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+    return pages;
+  };
+
   if (loading) {
     return (
       <section className="py-12 bg-gray-50 font-['Times_New_Roman']">
@@ -218,7 +240,8 @@ export default function ProductBanner() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center gap-2 mt-8">
+          // Thêm flex-wrap để nếu trên mobile màn hình quá nhỏ thì nó tự rớt dòng cho gọn
+          <div className="flex flex-wrap justify-center items-center gap-2 mt-8">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
@@ -226,15 +249,27 @@ export default function ProductBanner() {
             >
               Trang trước
             </button>
-            {[...Array(totalPages)].map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentPage(idx + 1)}
-                className={`px-4 py-2 border rounded-full ${currentPage === idx + 1 ? "bg-blue-600 text-white" : "hover:bg-blue-50"} transition`}
-              >
-                {idx + 1}
-              </button>
+            
+            {getPageNumbers().map((page, idx) => (
+              page === "..." ? (
+                <span key={`ellipsis-${idx}`} className="px-2 py-2 text-gray-500">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page as number)}
+                  className={`px-4 py-2 border rounded-full ${
+                    currentPage === page
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-blue-50 text-gray-700"
+                  } transition`}
+                >
+                  {page}
+                </button>
+              )
             ))}
+
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(prev => prev + 1)}

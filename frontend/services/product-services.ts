@@ -125,3 +125,30 @@ export const uploadExcelSheets = async (file: File): Promise<UploadExcelResult |
     handleError(error);
   }
 };
+
+export const getProductsByGroup = async (keyword: string): Promise<Product[]> => {
+  try {
+    const response = await fetch(`http://localhost:5146/api/products/group/${keyword}`);
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error("Lỗi fetch products by group:", error);
+    return [];
+  }
+};
+
+export const getSaleProducts = async (keyword?: string): Promise<Product[]> => {
+  try {
+    // Nếu có keyword thì gắn vào đuôi, không thì gọi API gốc
+    const url = keyword 
+      ? `http://localhost:5146/api/products/on-sale/${keyword}`
+      : `http://localhost:5146/api/products/on-sale`;
+
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error("Lỗi fetch sale products:", error);
+    return [];
+  }
+};
