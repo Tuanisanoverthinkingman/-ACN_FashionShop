@@ -11,7 +11,7 @@ import { Card } from "antd";
 
 export default function OrdersChart({ data }: { data: any[] }) {
   return (
-    <Card title="📈 Doanh thu theo tháng">
+    <Card title="Doanh thu theo tháng">
       <ResponsiveContainer width="100%" height={350}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />

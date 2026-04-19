@@ -30,22 +30,17 @@ namespace Controllers
             var userId = GetUserIdFromToken();
             if (userId == null) return Unauthorized("Không tìm thấy người dùng");
 
-            var product = await _context.products.FindAsync(request.ProductId);
-            if (product == null) return NotFound("Không tìm thấy sản phẩm");
+            // TÌM BIẾN THỂ THAY VÌ SẢN PHẨM CHUNG CHUNG
+            var variant = await _context.product_variants.FindAsync(request.ProductVariantId);
+            if (variant == null) return NotFound("Không tìm thấy phân loại sản phẩm này");
 
-            // Kiểm tra Instock
+            // Kiểm tra Instock trong bảng variant
             var existingCart = await _context.cartItems
-                .FirstOrDefaultAsync(c => c.UserId == userId && c.ProductId == request.ProductId);
+                .FirstOrDefaultAsync(c => c.UserId == userId && c.ProductVariantId == request.ProductVariantId);
 
             int totalQuantity = request.Quantity + (existingCart?.Quantity ?? 0);
-            if (totalQuantity > product.Instock)
-                return BadRequest($"Số lượng tối đa có thể thêm: {product.Instock - (existingCart?.Quantity ?? 0)}");
-
-            if (existingCart != null)
-            {
-                existingCart.Quantity += request.Quantity;
-                _context.cartItems.Update(existingCart);
-            }
+            if (totalQuantity > variant.Instock)
+                return BadRequest($"Số lượng tối đa có thể thêm: {variant.Instock - (existingCart?.Quantity ?? 0)}");
 
             CartItem cartItem;
 
@@ -60,7 +55,7 @@ namespace Controllers
                 cartItem = new CartItem
                 {
                     UserId = (int)userId,
-                    ProductId = request.ProductId,
+                    ProductVariantId = request.ProductVariantId, // Đổi thành ProductVariantId
                     Quantity = request.Quantity,
                     CreateAt = DateTime.UtcNow
                 };
@@ -85,15 +80,16 @@ namespace Controllers
             if (userId == null) return Unauthorized("Không tìm thấy người dùng.");
 
             var cartItem = await _context.cartItems
-                .Include(c => c.Product)
+                .Include(c => c.ProductVariant) // Kéo theo dữ liệu variant
                 .FirstOrDefaultAsync(c => c.CartItemId == request.CartItemId
                                        && c.UserId == userId);
 
             if (cartItem == null)
                 return NotFound("Không tìm thấy sản phẩm trong giỏ hàng");
 
-            if (request.Quantity > cartItem.Product.Instock)
-                return BadRequest($"Số lượng tối đa có thể đặt: {cartItem.Product.Instock}");
+            // Kiểm tra Instock từ ProductVariant
+            if (request.Quantity > cartItem.ProductVariant.Instock)
+                return BadRequest($"Số lượng tối đa có thể đặt: {cartItem.ProductVariant.Instock}");
 
             if (request.Quantity < 1)
             {
@@ -118,24 +114,32 @@ namespace Controllers
             if (userId == null) return Unauthorized("Không tìm thấy người dùng.");
 
             var cartItems = await _context.cartItems
+                .IgnoreQueryFilters() // Lấy cả những sản phẩm đã bị IsDeleted = true
                 .Where(c => c.UserId == userId)
-                .Include(c => c.Product)
-                    .ThenInclude(p => p.Category)
+                .Include(c => c.ProductVariant)
+                    .ThenInclude(v => v.Product)
                 .ToListAsync();
 
-            // Trả về dữ liệu gọn cho frontend
             var result = cartItems.Select(c => new
             {
                 cartItemId = c.CartItemId,
-                productId = c.ProductId,
+                productVariantId = c.ProductVariantId,
                 quantity = c.Quantity,
-                product = new
+                // Kiểm tra xem sản phẩm còn kinh doanh không
+                isAvailable = c.ProductVariant != null && c.ProductVariant.Product != null && !c.ProductVariant.Product.IsDeleted,
+                variant = c.ProductVariant == null ? null : new
                 {
-                    id = c.Product.Id,
-                    name = c.Product.Name,
-                    imageUrl = c.Product.ImageUrl,
-                    price = c.Product.Price,
-                    categoryId = c.Product.CategoryId
+                    size = c.ProductVariant.Size,
+                    color = c.ProductVariant.Color,
+                    price = c.ProductVariant.Price,
+                    inStock = c.ProductVariant.Instock
+                },
+                product = c.ProductVariant?.Product == null ? null : new
+                {
+                    id = c.ProductVariant.Product.Id,
+                    name = c.ProductVariant.Product.Name,
+                    imageUrl = c.ProductVariant.Product.ImageUrl,
+                    categoryId = c.ProductVariant.Product.CategoryId
                 }
             });
 
@@ -161,6 +165,7 @@ namespace Controllers
             return Ok(new { message = "Đã xoá sản phẩm khỏi giỏ hàng" });
         }
     }
+
     public class UpdateCartQuantityRequest
     {
         public int CartItemId { get; set; }
@@ -169,7 +174,7 @@ namespace Controllers
 
     public class CartRequest
     {
-        public int ProductId { get; set; }
+        public int ProductVariantId { get; set; }
         public int Quantity { get; set; }
     }
 }

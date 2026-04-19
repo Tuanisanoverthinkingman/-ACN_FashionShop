@@ -26,31 +26,44 @@ namespace Controllers
             return int.TryParse(sub, out int id) ? id : 0;
         }
 
-        // Tạo đơn hàng từ giỏ hàng
+        // 1. Tạo đơn hàng từ giỏ hàng (CÓ TRỪ KHO)
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> CreateOrder([FromBody] List<int> cartItemIds)
         {
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var userId = GetUserIdFromClaims();
-
                 if (cartItemIds == null || !cartItemIds.Any())
                     return BadRequest(new { message = "Bạn chưa chọn sản phẩm nào!" });
 
                 var selectedItems = await _context.cartItems
-                    .Include(c => c.Product)
+                    .Include(c => c.ProductVariant)
+                        .ThenInclude(v => v.Product) // Để lấy tên SP báo lỗi nếu cần
                     .Where(c => c.UserId == userId && cartItemIds.Contains(c.CartItemId))
                     .ToListAsync();
 
                 if (!selectedItems.Any())
                     return BadRequest(new { message = "Không tìm thấy sản phẩm trong giỏ hàng!" });
 
-                if (selectedItems.Any(c => c.Product == null))
-                    return BadRequest(new { message = "Một số sản phẩm không tồn tại!" });
+                // BƯỚC 1: KIỂM TRA TỒN KHO TRƯỚC
+                foreach (var item in selectedItems)
+                {
+                    if (item.ProductVariant == null)
+                        return BadRequest(new { message = "Một số phân loại sản phẩm không tồn tại!" });
 
-                decimal total = selectedItems.Sum(c => c.Product.Price * c.Quantity);
+                    if (item.ProductVariant.Instock < item.Quantity)
+                    {
+                        return BadRequest(new
+                        {
+                            message = $"Sản phẩm {item.ProductVariant.Product?.Name} - Size {item.ProductVariant.Size} chỉ còn {item.ProductVariant.Instock} sản phẩm!"
+                        });
+                    }
+                }
 
+                // BƯỚC 2: TÍNH TIỀN & TẠO ĐƠN
+                decimal total = selectedItems.Sum(c => c.ProductVariant.Price * c.Quantity);
                 var newOrder = new Order
                 {
                     UserId = userId,
@@ -62,30 +75,36 @@ namespace Controllers
                 _context.orders.Add(newOrder);
                 await _context.SaveChangesAsync();
 
+                // BƯỚC 3: LƯU CHI TIẾT & TRỪ KHO
                 foreach (var item in selectedItems)
                 {
+                    // Trừ tồn kho
+                    item.ProductVariant.Instock -= item.Quantity;
+
                     _context.orderDetails.Add(new OrderDetail
                     {
                         OrderId = newOrder.OrderId,
-                        ProductId = item.ProductId,
+                        ProductVariantId = item.ProductVariantId,
                         Quantity = item.Quantity,
-                        UnitPrice = item.Product.Price
+                        UnitPrice = item.ProductVariant.Price
                     });
                 }
 
                 _context.cartItems.RemoveRange(selectedItems);
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync(); // Xác nhận giao dịch hoàn tất
 
+                // Trả về dữ liệu đầy đủ
                 var createdOrder = await _context.orders
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.Product)
-                    .Include(o => o.Payments)
+                    .Include(o => o.OrderDetails).ThenInclude(od => od.ProductVariant).ThenInclude(v => v.Product)
                     .FirstOrDefaultAsync(o => o.OrderId == newOrder.OrderId);
+
                 return Ok(new { message = "Tạo đơn hàng thành công!", order = createdOrder });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi server nội bộ: " + ex.Message });
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "Lỗi hệ thống: " + ex.Message });
             }
         }
 
@@ -96,7 +115,8 @@ namespace Controllers
             var orders = await _context.orders
                 .Include(o => o.User)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.ProductVariant)
+                        .ThenInclude(v => v.Product)
                 .Include(o => o.Payments)
                 .ToListAsync();
 
@@ -112,7 +132,8 @@ namespace Controllers
             var orders = await _context.orders
                 .Where(o => o.UserId == userId)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                        .ThenInclude(v => v.Product)
                 .Include(o => o.Payments)
                 .ToListAsync();
 
@@ -125,7 +146,8 @@ namespace Controllers
         {
             var order = await _context.orders
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                        .ThenInclude(v => v.Product)
                 .Include(p => p.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
@@ -161,26 +183,29 @@ namespace Controllers
             return Ok(new { message = "Xoá đơn hàng thành công!" });
         }
 
-        // Tạo đơn trực tiếp bằng ProductId
+        // Tạo đơn trực tiếp (Mua ngay)
         [HttpPost("order-by-product")]
         [Authorize]
         public async Task<IActionResult> OrderByProduct([FromBody] OrderByProductDto dto)
         {
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var userId = GetUserIdFromClaims();
+                var variant = await _context.product_variants
+                    .Include(v => v.Product)
+                    .FirstOrDefaultAsync(p => p.Id == dto.ProductVariantId);
 
-                if (dto.ProductId <= 0 || dto.Quantity <= 0)
-                    return BadRequest(new { message = "Dữ liệu không hợp lệ!" });
+                if (variant == null)
+                    return NotFound(new { message = "Phân loại sản phẩm không tồn tại!" });
 
-                var product = await _context.products
-                    .FirstOrDefaultAsync(p => p.Id == dto.ProductId);
+                // KIỂM TRA TỒN KHO
+                if (variant.Instock < dto.Quantity)
+                {
+                    return BadRequest(new { message = $"Sản phẩm này chỉ còn {variant.Instock} sản phẩm!" });
+                }
 
-                if (product == null)
-                    return NotFound(new { message = "Sản phẩm không tồn tại!" });
-
-                var total = product.Price * dto.Quantity;
-
+                var total = variant.Price * dto.Quantity;
                 var order = new Order
                 {
                     UserId = userId,
@@ -192,38 +217,34 @@ namespace Controllers
                 _context.orders.Add(order);
                 await _context.SaveChangesAsync();
 
+                // TRỪ KHO & LƯU CHI TIẾT
+                variant.Instock -= dto.Quantity;
+
                 var orderDetail = new OrderDetail
                 {
                     OrderId = order.OrderId,
-                    ProductId = product.Id,
+                    ProductVariantId = variant.Id,
                     Quantity = dto.Quantity,
-                    UnitPrice = product.Price
+                    UnitPrice = variant.Price
                 };
 
                 _context.orderDetails.Add(orderDetail);
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
 
                 var createdOrder = await _context.orders
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(d => d.Product)
-                    .Include(o => o.Payments)
+                    .Include(o => o.OrderDetails).ThenInclude(d => d.ProductVariant).ThenInclude(v => v.Product)
                     .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
 
-                return Ok(new
-                {
-                    message = "Thanh toán sản phẩm thành công!",
-                    order = createdOrder
-                });
+                return Ok(new { message = "Thanh toán thành công!", order = createdOrder });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new
-                {
-                    message = "Lỗi server nội bộ: " + ex.Message
-                });
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "Lỗi hệ thống: " + ex.Message });
             }
         }
-        
+
         // Lấy các đơn hàng đã có ít nhất 1 payment
         [HttpGet("paid")]
         [Authorize(Roles = "Admin")]
@@ -232,7 +253,8 @@ namespace Controllers
             var orders = await _context.orders
                 .Include(o => o.User)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                        .ThenInclude(v => v.Product)
                 .Include(o => o.Payments)
                 .Where(o => o.Payments.Any())
                 .ToListAsync();
@@ -240,9 +262,10 @@ namespace Controllers
             return Ok(new { message = "Lấy các đơn hàng đã mua thành công!", orders });
         }
     }
+
     public class OrderByProductDto
     {
-        public int ProductId { get; set; }
+        public int ProductVariantId { get; set; }
         public int Quantity { get; set; }
     }
 }

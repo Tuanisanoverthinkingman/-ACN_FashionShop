@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using ZstdSharp.Unsafe;
 
 namespace Controllers
 {
@@ -8,6 +7,8 @@ namespace Controllers
     public class FileController : ControllerBase
     {
         private readonly IWebHostEnvironment _env;
+        private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
         public FileController(IWebHostEnvironment env)
         {
             _env = env;
@@ -17,30 +18,69 @@ namespace Controllers
         public async Task<IActionResult> UpLoadImage([FromForm] FileUpLoadRequest request)
         {
             var file = request.File;
+
             if (file == null || file.Length == 0)
-                return BadRequest("Không có tệp nào được tải lên");
+                return BadRequest(new { message = "Không có tệp nào được tải lên" });
 
-            // Đường dẫn thư mục tải lên (wwwroot/uploads)
-            var uploadPath = Path.Combine(_env.WebRootPath, "uploads");
-            if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!_allowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Định dạng tệp không hỗ trợ." });
 
-            // Tạo tên tệp duy nhất
-            var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-            var filePath = Path.Combine(uploadPath, fileName);
+            if (file.Length > 5 * 1024 * 1024)
+                return BadRequest(new { message = "Dung lượng ảnh quá lớn (Tối đa 5MB)" });
 
-            // Lưu tệp vào thư mục
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            try
             {
-                await file.CopyToAsync(stream);
-            }
+                var uploadPath = Path.Combine(_env.WebRootPath, "uploads");
+                if (!Directory.Exists(uploadPath)) 
+                    Directory.CreateDirectory(uploadPath);
 
-            // Trả về URL của tệp đã tải lên
-            var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{fileName}";
-            return Ok(new { imageUrl = fileUrl });
+                var fileName = Guid.NewGuid().ToString() + extension;
+                var filePath = Path.Combine(uploadPath, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{fileName}";
+                return Ok(new { imageUrl = fileUrl });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lưu file: " + ex.Message });
+            }
         }
+
+        // THÊM: Hàm xóa ảnh để dọn dẹp server
+        [HttpDelete("delete")]
+        public IActionResult DeleteImage([FromQuery] string imageUrl)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(imageUrl)) return BadRequest();
+
+                // Lấy tên file từ URL (ví dụ: http://.../uploads/abc.jpg -> abc.jpg)
+                var fileName = Path.GetFileName(imageUrl);
+                var filePath = Path.Combine(_env.WebRootPath, "uploads", fileName);
+
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                    return Ok(new { message = "Xóa file thành công" });
+                }
+
+                return NotFound(new { message = "Không tìm thấy file trên server" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xóa file: " + ex.Message });
+            }
+        }
+
         public class FileUpLoadRequest
         {
-            public IFormFile File { get; set; }
+            public IFormFile File { get; set; } = null!;
         }
     }
 }

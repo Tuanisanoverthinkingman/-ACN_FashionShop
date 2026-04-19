@@ -2,17 +2,17 @@ import { Table, Card } from "antd";
 
 export default function TopProducts({ data }: { data: any[] }) {
   const columns = [
-    { title: "Product", dataIndex: "productName" },
-    { title: "Quantity Sold", dataIndex: "quantitySold" },
+    { title: "Sản phẩm", dataIndex: "productName" },
+    { title: "Số lượng", dataIndex: "quantitySold" },
     {
-      title: "Revenue",
+      title: "Tổng tiền",
       dataIndex: "revenue",
       render: (v: number) => `${v.toLocaleString()} ₫`,
     },
   ];
 
   return (
-    <Card title="🔥 Top 5 sản phẩm bán chạy nhất">
+    <Card title="Top 5 sản phẩm bán chạy nhất">
       <Table
         columns={columns}
         dataSource={data}

@@ -256,8 +256,10 @@ namespace Controllers
                     bool applicable = promo.ApplyType switch
                     {
                         PromotionApplyType.General => promo.UserPromotions.Any(up => up.UserId == userId && !up.IsUsed),
-                        PromotionApplyType.Product => promo.PromotionProducts.Any(pp => pp.ProductId == od.ProductId),
-                        PromotionApplyType.Category => promo.PromotionCategories.Any(pc => pc.CategoryId == od.Product.CategoryId),
+                        
+                        PromotionApplyType.Product => promo.PromotionProducts.Any(pp => pp.ProductId == od.ProductVariant.ProductId),
+                        
+                        PromotionApplyType.Category => promo.PromotionCategories.Any(pc => pc.CategoryId == od.ProductVariant.Product.CategoryId),
                         _ => false
                     };
 

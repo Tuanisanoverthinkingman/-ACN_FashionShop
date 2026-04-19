@@ -67,9 +67,6 @@ namespace Controllers
             if (category == null)
                 return NotFound();
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role);
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-
             category.Name = request.Name;
             category.Description = request.Description;
 
@@ -88,24 +85,22 @@ namespace Controllers
             if (category == null)
                 return NotFound(new { message = "Danh mục không tồn tại." });
 
-            // KIỂM TRA CATEGORY CÓ PRODUCT KHÔNG
-            bool hasProducts = await _context.products
-                .AnyAsync(p => p.CategoryId == id);
+            // CẬP NHẬT: Chỉ kiểm tra các sản phẩm CHƯA BỊ XÓA MỀM
+            bool hasActiveProducts = await _context.products
+                .AnyAsync(p => p.CategoryId == id && !p.IsDeleted);
 
-            if (hasProducts)
+            if (hasActiveProducts)
             {
                 return BadRequest(new
                 {
-                    message = "Không thể xoá danh mục vì sản phẩm tồn tại trong danh mục."
+                    message = "Không thể xoá danh mục vì vẫn còn sản phẩm đang kinh doanh thuộc danh mục này."
                 });
             }
 
             _context.categories.Remove(category);
             await _context.SaveChangesAsync();
 
-            return Ok(
-                new { message = "Xóa Category thành công." }
-            );
+            return Ok(new { message = "Xóa danh mục thành công." });
         }
 
     }

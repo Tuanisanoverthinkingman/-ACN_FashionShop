@@ -13,11 +13,36 @@ namespace Controllers
     {
         private readonly AppDbContext _context;
         private readonly IMemoryCache _cache;
+        private readonly IConfiguration _config;
 
-        public EmailAndOTPController(AppDbContext context, IMemoryCache cache)
+        public EmailAndOTPController(AppDbContext context, IMemoryCache cache, IConfiguration config)
         {
             _context = context;
             _cache = cache;
+            _config = config;
+        }
+
+        // Hàm helper dùng chung để gửi Mail
+        private async Task SendMailAsync(string toEmail, string subject, string body, bool isHtml = false)
+        {
+            var emailSettings = _config.GetSection("EmailSettings");
+            using var smtp = new SmtpClient(emailSettings["Host"])
+            {
+                Port = int.Parse(emailSettings["Port"]),
+                Credentials = new NetworkCredential(emailSettings["Email"], emailSettings["Password"]),
+                EnableSsl = true
+            };
+
+            var mail = new MailMessage
+            {
+                From = new MailAddress(emailSettings["Email"]),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = isHtml
+            };
+            mail.To.Add(toEmail);
+
+            await smtp.SendMailAsync(mail);
         }
 
         // 1. Gửi OTP
@@ -25,47 +50,32 @@ namespace Controllers
         public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.EmailOrPhone))
-                return BadRequest("Email không được để trống");
+                return BadRequest(new { message = "Email không được để trống" });
 
             var normalizedEmail = request.EmailOrPhone.Trim().ToLower();
-            var user = await _context.users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
-            if (user == null)
-                return BadRequest("Email chưa được đăng ký");
 
-            // Check resend cooldown
+            // Check cooldown để tránh spam
             if (_cache.TryGetValue($"OTP_SENT_{normalizedEmail}", out _))
-                return BadRequest("Vui lòng chờ 60 giây trước khi gửi lại OTP");
+                return BadRequest(new { message = "Vui lòng chờ 60 giây trước khi gửi lại" });
+
+            var userExists = await _context.users.AnyAsync(u => u.Email == normalizedEmail);
+            if (!userExists)
+                return BadRequest(new { message = "Email chưa được đăng ký" });
 
             var otp = new Random().Next(100000, 999999).ToString();
 
-            // Lưu OTP cache 1 phút
-            _cache.Set($"OTP_{normalizedEmail}", otp, TimeSpan.FromMinutes(1));
+            _cache.Set($"OTP_{normalizedEmail}", otp, TimeSpan.FromMinutes(5)); // Tăng lên 5 phút cho user kịp nhập
             _cache.Set($"OTP_SENT_{normalizedEmail}", true, TimeSpan.FromSeconds(60));
 
             try
             {
-                using var smtp = new SmtpClient("smtp.gmail.com")
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("tuankiz1412@gmail.com", "ywjo fdkg oyvs luik"),
-                    EnableSsl = true
-                };
-                var mail = new MailMessage
-                {
-                    From = new MailAddress("tuankiz1412@gmail.com"),
-                    Subject = "OTP xác thực",
-                    Body = $"Mã OTP của bạn là: {otp}",
-                    IsBodyHtml = false
-                };
-                mail.To.Add(normalizedEmail);
-                smtp.Send(mail);
+                await SendMailAsync(normalizedEmail, "Mã OTP xác thực mật khẩu", $"Mã OTP của bạn là: {otp}. Hiệu lực trong 5 phút.");
+                return Ok(new { message = "OTP đã được gửi thành công" });
             }
-            catch
+            catch (Exception ex)
             {
-                return StatusCode(500, "Gửi email thất bại");
+                return StatusCode(500, new { message = "Lỗi gửi mail: " + ex.Message });
             }
-
-            return Ok("OTP đã được gửi, kiểm tra email");
         }
 
         // 2. Xác thực OTP → tạo resetToken
@@ -75,17 +85,16 @@ namespace Controllers
             var normalizedEmail = request.EmailOrPhone.Trim().ToLower();
 
             if (!_cache.TryGetValue($"OTP_{normalizedEmail}", out string cachedOtp))
-                return BadRequest("OTP đã hết hạn hoặc chưa được gửi");
+                return BadRequest(new { message = "OTP đã hết hạn hoặc chưa được gửi" });
 
             if (cachedOtp != request.Otp)
-                return BadRequest("OTP không đúng");
+                return BadRequest(new { message = "Mã OTP không chính xác" });
 
-            // Tạo reset token 15 phút
             var resetToken = Guid.NewGuid().ToString();
             _cache.Set($"RESET_{normalizedEmail}", resetToken, TimeSpan.FromMinutes(15));
             _cache.Remove($"OTP_{normalizedEmail}");
 
-            return Ok(new { message = "Xác thực OTP thành công", resetToken });
+            return Ok(new { message = "Xác thực thành công", resetToken });
         }
 
         // 3. Reset password bằng resetToken
@@ -94,33 +103,26 @@ namespace Controllers
         {
             var normalizedEmail = request.Email.Trim().ToLower();
 
-            if (!_cache.TryGetValue($"RESET_{normalizedEmail}", out string cachedToken))
-                return BadRequest("Reset token không hợp lệ hoặc đã hết hạn");
-
-            if (cachedToken != request.ResetToken)
-                return BadRequest("Reset token không hợp lệ");
+            if (!_cache.TryGetValue($"RESET_{normalizedEmail}", out string cachedToken) || cachedToken != request.ResetToken)
+                return BadRequest(new { message = "Phiên làm việc không hợp lệ hoặc đã hết hạn" });
 
             var user = await _context.users.FirstOrDefaultAsync(u => u.Email == normalizedEmail);
-            if (user == null)
-                return BadRequest("Người dùng không tồn tại");
+            if (user == null) return NotFound();
 
             user.Password = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             _cache.Remove($"RESET_{normalizedEmail}");
             await _context.SaveChangesAsync();
 
-            return Ok("Đổi mật khẩu thành công");
+            return Ok(new { message = "Đổi mật khẩu thành công" });
         }
 
         [HttpPost("send-verification-email")]
         public async Task<IActionResult> SendVerificationEmail([FromBody] SendEmailRequest request)
         {
             var user = await _context.users.FirstOrDefaultAsync(u => u.Email == request.Email);
-            if (user == null)
-                return NotFound("Người dùng không tồn tại");
+            if (user == null) return NotFound(new { message = "Người dùng không tồn tại" });
 
             var token = Guid.NewGuid().ToString();
-
-            // Lưu token vào database
             var emailVerification = new EmailVerification
             {
                 UserId = user.Id,
@@ -131,38 +133,21 @@ namespace Controllers
             };
 
             _context.EmailVerifications.Add(emailVerification);
-            await _context.SaveChangesAsync();
 
             try
             {
-                using var smtp = new SmtpClient("smtp.gmail.com")
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("tuankiz1412@gmail.com", "ywjo fdkg oyvs luik"),
-                    EnableSsl = true
-                };
-
                 var verifyLink = $"http://localhost:3000/verify-email?token={token}&email={user.Email}";
-                var mail = new MailMessage
-                {
-                    From = new MailAddress("tuankiz1412@gmail.com"),
-                    Subject = "Xác thực tài khoản",
-                    Body = $"Nhấn để xác thực tài khoản: {verifyLink}",
-                    IsBodyHtml = false
-                };
+                await SendMailAsync(user.Email, "Xác thực tài khoản của bạn",
+                    $"Vui lòng nhấn vào link sau để kích hoạt tài khoản: {verifyLink}");
 
-                mail.To.Add(user.Email);
-                smtp.Send(mail);
+                user.EmailVerificationSentAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Email xác thực đã được gửi" });
             }
             catch (Exception ex)
             {
-                return BadRequest("Gửi email thất bại: " + ex.Message);
+                return BadRequest(new { message = "Gửi email thất bại: " + ex.Message });
             }
-
-            user.EmailVerificationSentAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok("Email xác thực đã được gửi.");
         }
 
         [HttpPost("verify-email")]
@@ -194,7 +179,7 @@ namespace Controllers
             return Ok("Xác thực tài khoản thành công 🎉");
         }
     }
-    // Request models
+    
     public class SendOtpRequest
     {
         public string EmailOrPhone { get; set; } = string.Empty;

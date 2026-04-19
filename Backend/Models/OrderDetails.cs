@@ -17,9 +17,9 @@ namespace Models
         public Order? Order { get; set; }
 
         [Required]
-        [ForeignKey("Product")]
-        public int ProductId { get; set; }
-        public Product? Product { get; set; }
+        [ForeignKey("ProductVariant")]
+        public int ProductVariantId { get; set; }
+        public ProductVariant? ProductVariant { get; set; }
 
         [Required]
         public int Quantity { get; set; }

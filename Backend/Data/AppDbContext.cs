@@ -20,10 +20,13 @@ public class AppDbContext : DbContext
     public DbSet<PromotionProduct> promotionProducts { get; set; }
     public DbSet<EmailVerification> EmailVerifications { get; set; }
     public DbSet<Feedback> Feedbacks { get; set; }
+    public DbSet<ProductVariant> product_variants { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
 
         // Product → Category
         modelBuilder.Entity<Product>()

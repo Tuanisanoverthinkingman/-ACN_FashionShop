@@ -23,18 +23,28 @@ namespace Controllers
         {
             if (request.ApplyType != PromotionApplyType.General && _context.promotions.Any(p => p.Code == request.Code))
             {
-                return BadRequest(new { message = "Code promotion đã tồn tại" });
+                return BadRequest(new { message = "Mã khuyến mãi đã tồn tại" });
             }
 
             if (request.StartDate >= request.EndDate)
-                return BadRequest(new { message = "StartDate phải nhỏ hơn EndDate" });
+                return BadRequest(new { message = "Ngày bắt đầu phải trước ngày kết thúc" });
 
-            // Validate theo ApplyType
+            // Validate ApplyType
             var validateResult = ValidateApplyType(request);
-            if (validateResult != null)
-                return validateResult;
+            if (validateResult != null) return validateResult;
 
-            // Check nếu ApplyType là Product hoặc Category, tránh trùng sản phẩm/danh mục ---
+            // KIỂM TRA: Đảm bảo ProductIds gửi lên không chứa sản phẩm đã bị xóa mềm
+            if (request.ApplyType == PromotionApplyType.Product)
+            {
+                var invalidProducts = await _context.products
+                    .IgnoreQueryFilters()
+                    .AnyAsync(p => request.ProductIds.Contains(p.Id) && p.IsDeleted);
+
+                if (invalidProducts)
+                    return BadRequest(new { message = "Một số sản phẩm đã bị xóa mềm, không thể áp dụng khuyến mãi." });
+            }
+
+            // Xử lý ghi đè promotion cũ nếu trùng đối tượng (giữ nguyên logic của bạn)
             if (request.ApplyType == PromotionApplyType.Product)
             {
                 var existingPromo = await _context.promotions
@@ -44,17 +54,11 @@ namespace Controllers
 
                 if (existingPromo != null)
                 {
-                    // Cập nhật promotion hiện có
-                    existingPromo.DiscountPercent = request.DiscountPercent;
-                    existingPromo.Description = request.Description;
-                    existingPromo.StartDate = request.StartDate;
-                    existingPromo.EndDate = request.EndDate;
-
+                    UpdatePromoFields(existingPromo, request);
                     existingPromo.PromotionProducts.Clear();
                     AttachMappings(existingPromo, request);
-
                     await _context.SaveChangesAsync();
-                    return Ok(new { message = "Cập nhật promotion do sản phẩm đã có promotion Product khác" });
+                    return Ok(new { message = "Đã cập nhật chương trình cũ cho sản phẩm này" });
                 }
             }
             else if (request.ApplyType == PromotionApplyType.Category)
@@ -66,20 +70,15 @@ namespace Controllers
 
                 if (existingPromo != null)
                 {
-                    existingPromo.DiscountPercent = request.DiscountPercent;
-                    existingPromo.Description = request.Description;
-                    existingPromo.StartDate = request.StartDate;
-                    existingPromo.EndDate = request.EndDate;
-
+                    UpdatePromoFields(existingPromo, request);
                     existingPromo.PromotionCategories.Clear();
                     AttachMappings(existingPromo, request);
-
                     await _context.SaveChangesAsync();
-                    return Ok(new { message = "Cập nhật promotion do danh mục đã có promotion Category khác" });
+                    return Ok(new { message = "Đã cập nhật chương trình cũ cho danh mục này" });
                 }
             }
 
-            // Nếu không trùng, tạo mới promotion
+            // Tạo mới
             var promo = new Promotion
             {
                 Code = request.Code,
@@ -93,11 +92,10 @@ namespace Controllers
             };
 
             AttachMappings(promo, request);
-
             _context.promotions.Add(promo);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Tạo promotion thành công" });
+            return Ok(new { message = "Tạo khuyến mãi thành công" });
         }
 
         // 2. ADMIN - Lấy tất cả promotion
@@ -228,9 +226,9 @@ namespace Controllers
 
             var promos = await _context.promotions
                 .Include(p => p.PromotionProducts)
-                .ThenInclude(pp => pp.Product) // include luôn Product
+                    .ThenInclude(pp => pp.Product)
                 .Include(p => p.PromotionCategories)
-                .ThenInclude(pc => pc.Category) // include luôn Category
+                    .ThenInclude(pc => pc.Category)
                 .Where(p =>
                     p.Status == PromotionStatus.Active &&
                     p.StartDate <= now &&
@@ -248,11 +246,15 @@ namespace Controllers
                 p.StartDate,
                 p.EndDate,
                 p.ApplyType,
-                ProductIds = p.PromotionProducts.Select(pp => pp.ProductId),
-                ProductNames = p.PromotionProducts.Select(pp => pp.Product.Name),
+                // CHỈ LẤY Product chưa bị xóa (IsDeleted = false)
+                ProductIds = p.PromotionProducts.Where(pp => pp.Product != null && !pp.Product.IsDeleted).Select(pp => pp.ProductId),
+                ProductNames = p.PromotionProducts.Where(pp => pp.Product != null && !pp.Product.IsDeleted).Select(pp => pp.Product.Name),
                 CategoryIds = p.PromotionCategories.Select(pc => pc.CategoryId),
                 CategoryNames = p.PromotionCategories.Select(pc => pc.Category.Name)
-            });
+            })
+            // Lọc bỏ những promo mà sau khi lọc sản phẩm bị xóa thì không còn sản phẩm nào (đối với loại ApplyType.Product)
+            .Where(p => p.ApplyType != PromotionApplyType.Product || p.ProductIds.Any())
+            .ToList();
 
             return Ok(result);
         }
@@ -286,20 +288,25 @@ namespace Controllers
             return Ok(result);
         }
 
-        // HELPER METHODS
+        // --- HELPER METHODS ---
+        private void UpdatePromoFields(Promotion promo, PromotionRequest request)
+        {
+            promo.DiscountPercent = request.DiscountPercent;
+            promo.Description = request.Description;
+            promo.StartDate = request.StartDate;
+            promo.EndDate = request.EndDate;
+        }
+
         private IActionResult? ValidateApplyType(PromotionRequest request)
         {
             return request.ApplyType switch
             {
                 PromotionApplyType.Product when request.ProductIds == null || !request.ProductIds.Any()
-                    => BadRequest(new { message = "Promotion Product cần ProductIds" }),
-
+                    => BadRequest(new { message = "Cần chọn ít nhất một sản phẩm" }),
                 PromotionApplyType.Category when request.CategoryIds == null || !request.CategoryIds.Any()
-                    => BadRequest(new { message = "Promotion Category cần CategoryIds" }),
-
+                    => BadRequest(new { message = "Cần chọn ít nhất một danh mục" }),
                 PromotionApplyType.User when request.UserIds == null || !request.UserIds.Any()
-                    => BadRequest(new { message = "Promotion User cần UserIds" }),
-
+                    => BadRequest(new { message = "Cần chọn ít nhất một người dùng" }),
                 _ => null
             };
         }
@@ -309,25 +316,13 @@ namespace Controllers
             switch (request.ApplyType)
             {
                 case PromotionApplyType.Product:
-                    promo.PromotionProducts = request.ProductIds!
-                        .Select(id => new PromotionProduct { ProductId = id })
-                        .ToList();
+                    promo.PromotionProducts = request.ProductIds!.Select(id => new PromotionProduct { ProductId = id }).ToList();
                     break;
-
                 case PromotionApplyType.Category:
-                    promo.PromotionCategories = request.CategoryIds!
-                        .Select(id => new PromotionCategory { CategoryId = id })
-                        .ToList();
+                    promo.PromotionCategories = request.CategoryIds!.Select(id => new PromotionCategory { CategoryId = id }).ToList();
                     break;
-
                 case PromotionApplyType.User:
-                    promo.UserPromotions = request.UserIds!
-                        .Select(id => new UserPromotion
-                        {
-                            UserId = id,
-                            IsUsed = false
-                        })
-                        .ToList();
+                    promo.UserPromotions = request.UserIds!.Select(id => new UserPromotion { UserId = id, IsUsed = false }).ToList();
                     break;
             }
         }
@@ -448,7 +443,7 @@ namespace Controllers
             });
         }
     }
-    
+
     // REQUEST DTO
     public class PromotionRequest
     {

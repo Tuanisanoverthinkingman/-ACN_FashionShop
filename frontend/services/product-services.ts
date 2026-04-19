@@ -1,12 +1,20 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
+export interface ProductVariant {
+  id: number;
+  productId: number;
+  size: string;
+  color: string;
+  costPrice: number;
+  price: number;
+  instock: number;
+}
+
 export interface Product {
   id: number;
   name: string;
   description: string;
-  price: number;
-  instock: number;
   imageUrl?: string;
   categoryId: number;
   category?: {
@@ -14,22 +22,22 @@ export interface Product {
     name: string;
   };
   createAt?: string;
+  isDeleted: boolean;
+  productVariants: ProductVariant[];
 }
 
 export interface ProductRequest {
   name: string;
   description: string;
-  price: number;
-  instock: number;
   imageUrl?: string | null;
   categoryId: number;
+  productVariants: Omit<ProductVariant, "id" | "productId">[];
 }
 
 export interface UploadExcelResult {
   message: string;
   errors?: string[];
 }
-
 
 // Helper handle lỗi
 const handleError = (error: any) => {
@@ -42,17 +50,16 @@ const handleError = (error: any) => {
   }
 };
 
-// Lấy tất cả sản phẩm
 export const getAll = async (): Promise<Product[] | undefined> => {
   try {
     const res = await api.get("/api/products");
+    console.log("Dữ liệu thực tế từ API:", res.data);
     return res.data;
   } catch (error) {
     handleError(error);
   }
 };
 
-// Lấy sản phẩm theo id
 export const getById = async (id: number): Promise<Product | undefined> => {
   try {
     const res = await api.get(`/api/products/${id}`);
@@ -62,7 +69,6 @@ export const getById = async (id: number): Promise<Product | undefined> => {
   }
 };
 
-// Lấy sản phẩm theo categoryId
 export const getByCategoryId = async (categoryId: number): Promise<Product[] | undefined> => {
   try {
     const res = await api.get(`/api/products/by-category/${categoryId}`);
@@ -72,7 +78,6 @@ export const getByCategoryId = async (categoryId: number): Promise<Product[] | u
   }
 };
 
-// Tạo sản phẩm mới (Admin)
 export const createProduct = async (data: ProductRequest): Promise<Product | undefined> => {
   try {
     const res = await api.post("/api/products", data);
@@ -83,7 +88,6 @@ export const createProduct = async (data: ProductRequest): Promise<Product | und
   }
 };
 
-// Cập nhật sản phẩm (Admin)
 export const updateProduct = async (id: number, data: ProductRequest): Promise<Product | undefined> => {
   try {
     const res = await api.put(`/api/products/${id}`, data);
@@ -94,7 +98,6 @@ export const updateProduct = async (id: number, data: ProductRequest): Promise<P
   }
 };
 
-// Xoá sản phẩm (Admin)
 export const deleteProduct = async (id: number): Promise<void> => {
   try {
     const res = await api.delete(`/api/products/${id}`);
@@ -104,7 +107,7 @@ export const deleteProduct = async (id: number): Promise<void> => {
   }
 };
 
-// Upload Excel để thêm nhiều sản phẩm (Admin)
+// Upload Excel
 export const uploadExcelSheets = async (file: File): Promise<UploadExcelResult | undefined> => {
   try {
     const formData = new FormData();
@@ -115,11 +118,10 @@ export const uploadExcelSheets = async (file: File): Promise<UploadExcelResult |
     });
 
     if (res.data.errors && res.data.errors.length > 0) {
-      toast.warn(`Upload hoàn tất, có lỗi ở ${res.data.errors.length} row`);
+      toast.warn(`Upload hoàn tất, có lỗi ở ${res.data.errors.length} dòng`);
     } else {
       toast.success("Upload Excel thành công");
     }
-
     return res.data;
   } catch (error) {
     handleError(error);
@@ -128,9 +130,8 @@ export const uploadExcelSheets = async (file: File): Promise<UploadExcelResult |
 
 export const getProductsByGroup = async (keyword: string): Promise<Product[]> => {
   try {
-    const response = await fetch(`http://localhost:5146/api/products/group/${keyword}`);
-    if (!response.ok) return [];
-    return await response.json();
+    const res = await api.get(`/api/products/group/${keyword}`);
+    return res.data;
   } catch (error) {
     console.error("Lỗi fetch products by group:", error);
     return [];
@@ -139,16 +140,33 @@ export const getProductsByGroup = async (keyword: string): Promise<Product[]> =>
 
 export const getSaleProducts = async (keyword?: string): Promise<Product[]> => {
   try {
-    // Nếu có keyword thì gắn vào đuôi, không thì gọi API gốc
     const url = keyword 
-      ? `http://localhost:5146/api/products/on-sale/${keyword}`
-      : `http://localhost:5146/api/products/on-sale`;
-
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) return [];
-    return await response.json();
+      ? `/api/products/on-sale/${keyword}`
+      : `/api/products/on-sale`;
+    const res = await api.get(url);
+    return res.data;
   } catch (error) {
     console.error("Lỗi fetch sale products:", error);
     return [];
+  }
+};
+
+// Lấy toàn bộ sản phẩm cho Admin (Thấy cả hàng đã xóa mềm)
+export const getAllForAdmin = async (): Promise<Product[] | undefined> => {
+  try {
+    const res = await api.get("/api/products/admin-all");
+    return res.data;
+  } catch (error) {
+    handleError(error);
+  }
+};
+
+// Khôi phục sản phẩm đã bị xóa mềm
+export const restoreProduct = async (id: number): Promise<void> => {
+  try {
+    const res = await api.put(`/api/products/restore/${id}`);
+    toast.success(res.data.message || "Khôi phục sản phẩm thành công");
+  } catch (error) {
+    handleError(error);
   }
 };

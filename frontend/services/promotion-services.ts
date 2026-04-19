@@ -27,14 +27,11 @@ export interface Promotion {
   categoryIds: number[];
   userIds: number[];
 
-  // Mới thêm
   productNames?: string[];
   categoryNames?: string[];
 }
 
-// ===============================
-// Transform backend → frontend
-// ===============================
+// Hàm chuẩn hóa dữ liệu từ API
 const transformPromotion = (promo: any): Promotion => ({
   promotionId: promo.promotionId,
   code: promo.code,
@@ -51,18 +48,13 @@ const transformPromotion = (promo: any): Promotion => ({
   categoryNames: promo.categoryNames ?? [],
 });
 
-// ===============================
-// Error handler
-// ===============================
 const handleError = (error: any) => {
-  toast.error(error.response?.data?.message || "Có lỗi xảy ra");
+  const message = error.response?.data?.message || error.response?.data || "Có lỗi xảy ra liên quan đến khuyến mãi";
+  toast.error(message);
 };
 
-// ===============================
-// PUBLIC – Promotion active
-// GET /api/promotions
-// ===============================
-export const getActivePromotions = async (): Promise<Promotion[] | undefined> => {
+// 1. PUBLIC - Lấy các khuyến mãi đang hiệu lực (Đã lọc SP Soft Delete ở Backend)
+export const getActivePromotions = async (): Promise<Promotion[]> => {
   try {
     const res = await api.get("/api/promotions");
     return res.data.map(transformPromotion);
@@ -72,10 +64,8 @@ export const getActivePromotions = async (): Promise<Promotion[] | undefined> =>
   }
 };
 
-// ===============================
-// ADMIN – All promotions
-// ===============================
-export const getAllPromotionsAdmin = async (): Promise<Promotion[] | undefined> => {
+// 2. ADMIN - Lấy tất cả (Bao gồm cả SP đã xóa mềm nếu dùng IgnoreQueryFilters)
+export const getAllPromotionsAdmin = async (): Promise<Promotion[]> => {
   try {
     const res = await api.get("/api/promotions/admin");
     return res.data.map(transformPromotion);
@@ -85,12 +75,7 @@ export const getAllPromotionsAdmin = async (): Promise<Promotion[] | undefined> 
   }
 };
 
-// ===============================
-// ADMIN – Get by ID
-// ===============================
-export const getPromotionById = async (
-  id: number
-): Promise<Promotion | undefined> => {
+export const getPromotionById = async (id: number): Promise<Promotion | undefined> => {
   try {
     const res = await api.get(`/api/promotions/${id}`);
     return transformPromotion(res.data);
@@ -99,61 +84,45 @@ export const getPromotionById = async (
   }
 };
 
-// ===============================
-// ADMIN – Create
-// ===============================
 export const createPromotion = async (data: any) => {
   try {
     const res = await api.post("/api/promotions", data);
-    toast.success(res.data.message);
+    toast.success(res.data.message || "Tạo khuyến mãi thành công");
     return res.data;
   } catch (error) {
     handleError(error);
   }
 };
 
-// ===============================
-// ADMIN – Update
-// ===============================
 export const updatePromotion = async (id: number, data: any) => {
   try {
     const res = await api.put(`/api/promotions/${id}`, data);
-    toast.success(res.data.message);
+    toast.success(res.data.message || "Cập nhật khuyến mãi thành công");
     return res.data;
   } catch (error) {
     handleError(error);
   }
 };
 
-// ===============================
-// ADMIN – Delete
-// ===============================
 export const deletePromotion = async (id: number) => {
   try {
     const res = await api.delete(`/api/promotions/${id}`);
-    toast.success(res.data.message);
+    toast.success(res.data.message || "Đã xóa khuyến mãi");
   } catch (error) {
     handleError(error);
   }
 };
 
-// ===============================
-// ADMIN – Toggle status
-// ===============================
 export const togglePromotionStatus = async (id: number) => {
   try {
     const res = await api.put(`/api/promotions/${id}/status`);
-    toast.success(res.data.message);
+    toast.success(res.data.message || "Đã thay đổi trạng thái khuyến mãi");
     return res.data;
   } catch (error) {
     handleError(error);
   }
 };
 
-// ===============================
-// USER – Lấy promotion có thể claim (General)
-// GET /api/promotions/claimable
-// ===============================
 export const getClaimablePromotions = async (): Promise<Promotion[]> => {
   try {
     const res = await api.get("/api/promotions/claimable");
@@ -169,6 +138,11 @@ export const isPromoApplicable = (
   productId: number,
   categoryId?: number
 ): boolean => {
+  if (promo.status === PromotionStatus.Expired) return false;
+
+  const now = new Date();
+  if (new Date(promo.startDate) > now || new Date(promo.endDate) < now) return false;
+
   switch (promo.applyType) {
     case PromotionApplyType.General:
     case PromotionApplyType.User:
@@ -176,9 +150,7 @@ export const isPromoApplicable = (
     case PromotionApplyType.Product:
       return promo.productIds.includes(productId);
     case PromotionApplyType.Category:
-      return categoryId
-        ? promo.categoryIds.includes(categoryId)
-        : false;
+      return categoryId ? promo.categoryIds.includes(categoryId) : false;
     default:
       return false;
   }

@@ -100,31 +100,85 @@ namespace Controllers
                         string categoryName = item["product_type"]?.ToString() ?? "Khác";
                         int categoryId = categoryDict.TryGetValue(categoryName, out int id) ? id : existingCategories.FirstOrDefault()?.Id ?? 0;
 
-                        var firstVariant = item["variants"]?[0];
-                        var firstImage = item["images"]?[0];
+                        var imagesArray = item["images"] as JArray;
+                        string? imageUrl = (imagesArray != null && imagesArray.Count > 0)
+                                           ? imagesArray[0]["src"]?.ToString()
+                                           : null;
 
+                        // Xử lý mô tả
                         string html = item["body_html"]?.ToString() ?? "";
                         var doc = new HtmlDocument();
                         doc.LoadHtml(html);
                         string plainDescription = doc.DocumentNode.InnerText;
+                        if (plainDescription.Length > 4000) plainDescription = plainDescription.Substring(0, 4000);
 
-                        if (plainDescription.Length > 4000)
-                            plainDescription = plainDescription.Substring(0, 4000);
-
+                        // 1. Tạo đối tượng Product (Thông tin chung)
                         var product = new Product
                         {
                             Name = productName,
                             Description = plainDescription,
-                            Price = decimal.TryParse(firstVariant?["price"]?.ToString(), out var price) ? price : 0,
-                            Instock = Random.Shared.Next(50, 201),
-                            ImageUrl = firstImage?["src"]?.ToString(),
-                            CategoryId = categoryId
+                            ImageUrl = imageUrl,
+                            CategoryId = categoryId,
+                            ProductVariants = new List<ProductVariant>() // Khởi tạo list để chứa các size/màu
                         };
+
+                        // 2. Lặp qua TẤT CẢ các biến thể của sản phẩm này
+                        var optionsArray = item["options"] as JArray;
+                        string sizeOptionKey = "option2"; // Giá trị dự phòng mặc định
+                        string colorOptionKey = "option1"; // Giá trị dự phòng mặc định
+
+                        if (optionsArray != null)
+                        {
+                            for (int i = 0; i < optionsArray.Count; i++)
+                            {
+                                string optionName = optionsArray[i]["name"]?.ToString().ToLower() ?? "";
+
+                                // Nếu tên option chứa chữ "kích thước", "size" thì nó nằm ở option(i+1)
+                                if (optionName.Contains("kích") || optionName.Contains("size"))
+                                {
+                                    sizeOptionKey = $"option{i + 1}";
+                                }
+                                // Nếu tên option chứa chữ "màu", "color"
+                                else if (optionName.Contains("màu") || optionName.Contains("color"))
+                                {
+                                    colorOptionKey = $"option{i + 1}";
+                                }
+                            }
+                        }
+
+                        // 2. Lặp qua TẤT CẢ các biến thể của sản phẩm này
+                        var variantsArray = item["variants"] as JArray;
+                        if (variantsArray != null)
+                        {
+                            foreach (var variant in variantsArray)
+                            {
+                                decimal price = decimal.TryParse(variant["price"]?.ToString(), out var p) ? p : 0;
+                                decimal costPrice = price * 0.7m; // Giá nhập = 70% giá bán
+
+                                // LOGIC MỚI: Lấy giá trị dựa trên Key đã phân tích được ở trên
+                                string size = variant[sizeOptionKey]?.ToString() ?? "FreeSize";
+                                string color = variant[colorOptionKey]?.ToString() ?? "Mặc định";
+
+                                // Dọn dẹp dữ liệu (Tránh trường hợp bị rỗng)
+                                if (string.IsNullOrWhiteSpace(size)) size = "FreeSize";
+                                if (string.IsNullOrWhiteSpace(color)) color = "Mặc định";
+
+                                int stock = int.TryParse(variant["inventory_quantity"]?.ToString(), out var qty) ? qty : Random.Shared.Next(10, 50);
+
+                                product.ProductVariants.Add(new ProductVariant
+                                {
+                                    Color = color,
+                                    Size = size,
+                                    Price = price,
+                                    CostPrice = costPrice,
+                                    Instock = stock
+                                });
+                            }
+                        }
 
                         newProducts.Add(product);
                         existingProductNames.Add(productName);
                     }
-
                     totalFetched += productsArray.Count;
                     page++; // Chuyển sang trang tiếp theo
 

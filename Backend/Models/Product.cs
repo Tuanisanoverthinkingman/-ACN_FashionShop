@@ -18,20 +18,10 @@ namespace Models
         [Column(TypeName = "longtext")]
         public string Description { get; set; }
 
-        [Required]
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal CostPrice { get; set; } // Giá nhập
-
-        [Required]
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal Price { get; set; } // Giá bán
-
-        [Required]
-        [Column(TypeName = "int")]
-        public int Instock { get; set; }
-
         [Column(TypeName = "nvarchar(255)")]
         public string? ImageUrl { get; set; }
+
+        public bool IsDeleted { get; set; } = false;
 
         [Required]
         [ForeignKey("Category")]
@@ -40,6 +30,9 @@ namespace Models
 
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
+
+        //Liên kết 1 - N tới bảng ProductVariant
+        public ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 
         public ICollection<PromotionProduct> PromotionProducts { get; set; }
         public ICollection<Feedback> Feedbacks { get; set; }

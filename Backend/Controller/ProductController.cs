@@ -22,21 +22,56 @@ namespace Controllers
         public async Task<IActionResult> GetAll()
         {
             var products = await _context.products
+                .Where(p => !p.IsDeleted)
                 .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
                 .OrderByDescending(p => p.Id)
                 .ToListAsync();
             return Ok(products);
         }
 
+        // Lấy toàn bộ sản phẩm (Dành cho Admin - Thấy cả hàng đã xóa)
+        [HttpGet("admin-all")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllForAdmin()
+        {
+            var products = await _context.products
+                .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
+                .IgnoreQueryFilters()
+                .OrderByDescending(p => p.Id)
+                .ToListAsync();
+            return Ok(products);
+        }
+
+        // Admin khôi phục sản phẩm
+        [HttpPut("restore/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var product = await _context.products
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (product == null) return NotFound(new { message = "Không tìm thấy sản phẩm để khôi phục" });
+
+            product.IsDeleted = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Sản phẩm đã được khôi phục thành công" });
+        }
         //Lấy sản phẩm theo id
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var product = await _context.products
                 .Include(p => p.Category)
+                .Include(p => p.ProductVariants) // THÊM DÒNG NÀY
                 .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null)
                 return NotFound();
+
             return Ok(product);
         }
 
@@ -56,12 +91,22 @@ namespace Controllers
             {
                 Name = request.Name,
                 Description = request.Description,
-                CostPrice = request.CostPrice,
-                Price = request.Price,
-                Instock = request.Instock,
                 ImageUrl = request.ImageUrl,
                 CategoryId = request.CategoryId,
-                CreateAt = DateTime.UtcNow
+                CreateAt = DateTime.UtcNow,
+
+                // LOGIC MỚI: Tự động tạo 1 phân loại hàng mặc định từ dữ liệu form cũ
+                ProductVariants = new List<ProductVariant>
+                {
+                    new ProductVariant
+                    {
+                        Size = "FreeSize",
+                        Color = "Mặc định",
+                        CostPrice = request.CostPrice,
+                        Price = request.Price,
+                        Instock = request.Instock
+                    }
+                }
             };
 
             _context.products.Add(product);
@@ -85,13 +130,11 @@ namespace Controllers
                 stream.Position = 0;
 
                 using var package = new ExcelPackage(stream);
-
                 var errors = new List<string>();
 
                 foreach (var worksheet in package.Workbook.Worksheets)
                 {
-                    if (worksheet.Dimension == null)
-                        continue;
+                    if (worksheet.Dimension == null) continue;
 
                     string categoryName = worksheet.Name.Trim();
                     if (string.IsNullOrEmpty(categoryName)) continue;
@@ -121,18 +164,13 @@ namespace Controllers
 
                             string desc = worksheet.Cells[row, 2].Text?.Trim();
 
-                            if (!decimal.TryParse(
-                                worksheet.Cells[row, 3].Text.Replace(",", "").Trim(),
-                                out var price))
+                            if (!decimal.TryParse(worksheet.Cells[row, 3].Text.Replace(",", "").Trim(), out var price))
                             {
                                 errors.Add($"Sheet '{categoryName}', Row {row}: Price không hợp lệ");
                                 continue;
                             }
 
-                            int instock = int.TryParse(
-                                worksheet.Cells[row, 4].Text.Trim(),
-                                out var s) ? s : 0;
-
+                            int instock = int.TryParse(worksheet.Cells[row, 4].Text.Trim(), out var s) ? s : 0;
                             string imageUrl = worksheet.Cells[row, 5].Text?.Trim();
 
                             if (!decimal.TryParse(worksheet.Cells[row, 6].Text.Replace(",", "").Trim(), out var costPrice))
@@ -145,12 +183,22 @@ namespace Controllers
                             {
                                 Name = name,
                                 Description = desc,
-                                CostPrice = costPrice,
-                                Price = price,
-                                Instock = instock,
                                 ImageUrl = imageUrl,
                                 CategoryId = category.Id,
-                                CreateAt = DateTime.UtcNow
+                                CreateAt = DateTime.UtcNow,
+
+                                // LOGIC MỚI: Đưa Price, CostPrice, Instock vào Biến thể mặc định
+                                ProductVariants = new List<ProductVariant>
+                                {
+                                    new ProductVariant
+                                    {
+                                        Size = "FreeSize",
+                                        Color = "Mặc định",
+                                        CostPrice = costPrice,
+                                        Price = price,
+                                        Instock = instock
+                                    }
+                                }
                             };
 
                             _context.products.Add(product);
@@ -167,9 +215,7 @@ namespace Controllers
 
                 return Ok(new
                 {
-                    message = errors.Any()
-                        ? "Upload xong nhưng có dòng lỗi"
-                        : "Upload thành công",
+                    message = errors.Any() ? "Upload xong nhưng có dòng lỗi" : "Upload thành công",
                     errors
                 });
             }
@@ -179,11 +225,7 @@ namespace Controllers
                 Console.WriteLine(ex.ToString());
                 Console.WriteLine("===================================");
 
-                return StatusCode(500, new
-                {
-                    message = "Upload Excel thất bại",
-                    error = ex.Message
-                });
+                return StatusCode(500, new { message = "Upload Excel thất bại", error = ex.Message });
             }
         }
 
@@ -193,37 +235,48 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateProductRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var product = await _context.products.FirstOrDefaultAsync(p => p.Id == id);
+            // LOGIC MỚI: Kéo thêm bảng ProductVariants lên để update
+            var product = await _context.products
+                .Include(p => p.ProductVariants)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null)
                 return NotFound(new { message = "Sản phẩm không tồn tại." });
 
-            // Nếu muốn kiểm tra lại CategoryId
             var category = await _context.categories.FindAsync(request.CategoryId);
-            if (category == null)
-                return BadRequest("CategoryId không hợp lệ!");
+            if (category == null) return BadRequest("CategoryId không hợp lệ!");
 
             product.Name = request.Name;
             product.Description = request.Description;
-            product.Price = request.Price;
-            product.Instock = request.Instock;
             product.CategoryId = request.CategoryId;
 
-            if (request.ImageUrl == null)
+            if (request.ImageUrl == null) product.ImageUrl = null;
+            else product.ImageUrl = request.ImageUrl;
+
+            // LOGIC MỚI: Cập nhật giá và kho vào biến thể đầu tiên (mặc định)
+            var firstVariant = product.ProductVariants.FirstOrDefault();
+            if (firstVariant != null)
             {
-                // user xoá ảnh
-                product.ImageUrl = null;
+                firstVariant.Price = request.Price;
+                firstVariant.CostPrice = request.CostPrice;
+                firstVariant.Instock = request.Instock;
             }
             else
             {
-                // user giữ ảnh hoặc upload ảnh mới
-                product.ImageUrl = request.ImageUrl;
+                // Nếu sản phẩm này trước đó chưa có biến thể nào, tạo mới
+                product.ProductVariants.Add(new ProductVariant
+                {
+                    Size = "FreeSize",
+                    Color = "Mặc định",
+                    CostPrice = request.CostPrice,
+                    Price = request.Price,
+                    Instock = request.Instock
+                });
             }
 
             await _context.SaveChangesAsync();
-
             return Ok(new { message = "Cập nhật sản phẩm thành công." });
         }
 
@@ -232,17 +285,27 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            var product = await _context.products.FirstOrDefaultAsync(p => p.Id == id);
+            // Tìm sản phẩm bao gồm cả những cái đã xóa để tránh lỗi logic
+            var product = await _context.products
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (product == null)
-                return NotFound();
+            {
+                return NotFound(new { message = "Sản phẩm không tồn tại." });
+            }
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role);
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            if (product.IsDeleted)
+            {
+                return BadRequest(new { message = "Sản phẩm này đã nằm trong danh sách ngưng bán rồi." });
+            }
 
-            _context.products.Remove(product);
+            // Thực hiện xóa mềm
+            product.IsDeleted = true;
+
+            _context.products.Update(product);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Xóa sản phẩm thành công." });
+            return Ok(new { message = "Sản phẩm đã được chuyển vào trạng thái ngưng bán (Xóa mềm)." });
         }
 
         // Lấy sp bằng mã DM
@@ -250,8 +313,10 @@ namespace Controllers
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
             var products = await _context.products
+                .Where(p => !p.IsDeleted)
                 .Where(p => p.CategoryId == categoryId)
                 .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
                 .OrderByDescending(p => p.Id)
                 .ToListAsync();
 
@@ -269,70 +334,62 @@ namespace Controllers
                 return BadRequest(new { message = "Từ khoá không hợp lệ." });
 
             string searchTerm = keyword.ToLower().Trim();
-
-            // Xử lý mapping từ URL không dấu (của Frontend) sang Tiếng Việt có dấu (trong Database)
             if (searchTerm == "ao") searchTerm = "áo";
             else if (searchTerm == "quan") searchTerm = "quần";
             else if (searchTerm == "phu-kien" || searchTerm == "phukien") searchTerm = "phụ kiện";
 
-            // Tìm tất cả sản phẩm mà tên Danh mục của nó có chứa từ khoá (Ví dụ: chứa chữ "áo")
             var products = await _context.products
+                .Where(p => !p.IsDeleted)
                 .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
                 .Where(p => p.Category != null && p.Category.Name.ToLower().Contains(searchTerm))
                 .OrderByDescending(p => p.Id)
                 .ToListAsync();
 
-            // Nếu không có, nên trả về mảng rỗng [] cùng status 200 OK để Frontend dùng hàm .map() không bị lỗi crash app
             return Ok(products);
         }
 
-        // Lấy danh sách sản phẩm ĐANG SALE (có thể lọc thêm theo nhóm danh mục)
-        // Dùng cho trang /sale và /sale/{keyword}
+        // Lấy danh sách sản phẩm ĐANG SALE 
         [HttpGet("on-sale/{keyword?}")]
         public async Task<IActionResult> GetSaleProducts(string? keyword = null)
         {
             var now = DateTime.UtcNow;
 
-            // 1. Lấy danh sách ID của Sản phẩm và Danh mục đang được áp dụng khuyến mãi
             var activePromos = await _context.promotions
                 .Include(p => p.PromotionProducts)
                 .Include(p => p.PromotionCategories)
                 .Where(p => p.Status == PromotionStatus.Active &&
-                            p.StartDate <= now &&
-                            p.EndDate >= now &&
-                            p.ApplyType != PromotionApplyType.User) // Bỏ qua promo của cá nhân
+                            p.StartDate <= now && p.EndDate >= now &&
+                            p.ApplyType != PromotionApplyType.User)
                 .ToListAsync();
 
             var onSaleProductIds = activePromos.SelectMany(p => p.PromotionProducts.Select(pp => pp.ProductId)).Distinct().ToList();
             var onSaleCategoryIds = activePromos.SelectMany(p => p.PromotionCategories.Select(pc => pc.CategoryId)).Distinct().ToList();
 
-            // Lấy xem có khuyến mãi General không (nếu General là giảm toàn shop)
             bool hasGeneralPromo = activePromos.Any(p => p.ApplyType == PromotionApplyType.General);
 
-            // 2. Bắt đầu query Sản phẩm
-            var query = _context.products.Include(p => p.Category).AsQueryable();
+            // THÊM INCLUDE PRODUCTVARIANTS VÀO QUERY
+            var query = _context.products
+                .Include(p => p.Category)
+                .Include(p => p.ProductVariants)
+                .AsQueryable();
 
-            // Nếu không có General Promo, thì chỉ lấy những sản phẩm nằm trong danh sách giảm giá
             if (!hasGeneralPromo)
             {
                 query = query.Where(p => onSaleProductIds.Contains(p.Id) || onSaleCategoryIds.Contains(p.CategoryId));
             }
 
-            // 3. Nếu người dùng chọn menu cụ thể (Ví dụ: /sale/ao-thun, /sale/quan-dai)
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 string searchTerm = keyword.ToLower().Trim();
-
-                // Xử lý các keyword từ Mega Menu của bạn
-                if (searchTerm == "quan-ao") searchTerm = "áo|quần"; // Mẹo lấy cả 2
+                if (searchTerm == "quan-ao") searchTerm = "áo|quần";
                 else if (searchTerm == "ao-thun") searchTerm = "áo thun";
                 else if (searchTerm == "ao-so-mi") searchTerm = "áo sơ mi";
                 else if (searchTerm == "ao-khoac") searchTerm = "áo khoác";
-                else if (searchTerm == "quan-dai") searchTerm = "quần dài"; // Có thể query Kaki, Tây, Jogger
+                else if (searchTerm == "quan-dai") searchTerm = "quần dài";
                 else if (searchTerm == "quan-short") searchTerm = "quần short";
                 else if (searchTerm == "phu-kien") searchTerm = "phụ kiện";
 
-                // Nếu là "quan-ao", ta tìm chữ áo hoặc quần
                 if (searchTerm == "áo|quần")
                 {
                     query = query.Where(p => p.Category != null &&
@@ -345,7 +402,6 @@ namespace Controllers
             }
 
             var products = await query.OrderByDescending(p => p.Id).ToListAsync();
-
             return Ok(products);
         }
 

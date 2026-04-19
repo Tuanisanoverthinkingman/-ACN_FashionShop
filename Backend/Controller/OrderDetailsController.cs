@@ -22,9 +22,10 @@ namespace Controllers
         public async Task<IActionResult> GetByOrderId(int orderId)
         {
             var order = await _context.orders
-            .Include(o => o.OrderDetails!)
-            .ThenInclude(od => od.Product)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+                .Include(o => o.OrderDetails!)
+                    .ThenInclude(od => od.ProductVariant) // SỬA CHỖ NÀY: Gọi ProductVariant trước
+                        .ThenInclude(pv => pv.Product)    // RỒI MỚI GỌI Product để lấy Tên và Hình ảnh
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null) return NotFound("Không tìm thấy đơn hàng.");
 
@@ -36,19 +37,24 @@ namespace Controllers
         [Authorize]
         public async Task<IActionResult> GetByUser(int orderId)
         {
-            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null) return Unauthorized("Không tìm thấy thông tin người dùng.");
+            // Dùng cách lấy Sub/NameIdentifier đồng nhất với OrderController
+            var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
+                           ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            var userId = int.Parse(userIdClaim.Value);
-            Console.WriteLine($"Đã gọi API lấy chi tiết đơn hàng {orderId} bởi user {userId}");
+            if (!int.TryParse(userIdClaim, out int userId))
+                return Unauthorized("Không tìm thấy thông tin người dùng.");
+
             var order = await _context.orders
-            .Include(o => o.OrderDetails!)
-            .ThenInclude(od => od.Product)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+                .IgnoreQueryFilters() // Quan trọng: Khách hàng vẫn phải thấy sản phẩm cũ trong đơn hàng dù Admin đã xóa/ẩn sản phẩm đó
+                .Include(o => o.OrderDetails!)
+                    .ThenInclude(od => od.ProductVariant)
+                        .ThenInclude(pv => pv.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null) return NotFound("Không tìm thấy đơn hàng.");
 
-            if (order.UserId != userId) return Forbid("Bạn không có quyền truy cập đơn hàng này.");
+            // Kiểm tra quyền sở hữu đơn hàng
+            if (order.UserId != userId) return Forbid();
 
             return Ok(order.OrderDetails);
         }

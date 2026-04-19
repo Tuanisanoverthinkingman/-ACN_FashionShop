@@ -1,102 +1,83 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
-/**
- * Type Feedback trả về từ Backend
- * (GET /api/Feedback/product/{productId})
- */
+// 1. Cập nhật Interface để khớp với dữ liệu trả về từ API mới
 export interface FeedbackData {
-  id?: number;          // id feedback
-  productId: number;    // id sản phẩm
-  content: string;      // nội dung đánh giá
-  rating: number;       // số sao (1 - 5)
-  userId?: number;      // id user (backend tự gán)
-  userName?: string;    // 👈 tên người đánh giá (backend trả về)
+  id: number;          
+  productId: number;    
+  content: string;      
+  rating: number;       
+  userId: number;     
+  userName?: string;    
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-/**
- * Lấy tất cả feedback
- * - Admin: thấy tất cả
- * - User: chỉ thấy feedback của mình
- */
-export const getAllFeedback = async () => {
+// Interface dùng cho Request gửi đi
+export interface CreateFeedbackDto {
+  productId: number;
+  content: string;
+  rating: number;
+}
+
+// Helper xử lý thông báo lỗi
+const handleFeedbackError = (error: any, defaultMsg: string) => {
+  const message = error.response?.data?.message || error.response?.data || defaultMsg;
+  toast.error(message);
+  throw error;
+};
+
+// 2. Lấy tất cả feedback (Admin thấy hết, User thấy của mình)
+export const getAllFeedback = async (): Promise<FeedbackData[] | undefined> => {
   try {
     const res = await api.get("/api/Feedback");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lấy feedback thất bại");
-    throw error;
+    return handleFeedbackError(error, "Lấy danh sách đánh giá thất bại");
   }
 };
 
-/**
- * Lấy feedback theo productId
- * Dùng cho trang chi tiết sản phẩm
- */
-export const getFeedbackByProduct = async (productId: number) => {
+// 3. Lấy feedback theo từng sản phẩm (Dành cho trang chi tiết sản phẩm)
+export const getFeedbackByProduct = async (productId: number): Promise<FeedbackData[]> => {
   try {
     const res = await api.get(`/api/Feedback/product/${productId}`);
-    return res.data as FeedbackData[];
+    return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lấy feedback thất bại");
-    throw error;
+    // Không toast lỗi ở đây để tránh gây phiền khi sản phẩm chưa có feedback
+    console.error("Lỗi lấy feedback sản phẩm:", error);
+    return [];
   }
 };
 
-/**
- * Tạo feedback mới
- * userId lấy từ JWT (không gửi từ frontend)
- */
-export const createFeedback = async (data: {
-  productId: number;
-  content: string;
-  rating: number;
-}) => {
+// 4. Tạo feedback mới (Chỉ cho sản phẩm IsDeleted = false)
+export const createFeedback = async (data: CreateFeedbackDto) => {
   try {
     const res = await api.post("/api/Feedback", data);
-    toast.success("Tạo feedback thành công");
+    toast.success("Cảm ơn bạn đã để lại đánh giá! ⭐");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Tạo feedback thất bại");
-    throw error;
+    return handleFeedbackError(error, "Gửi đánh giá thất bại");
   }
 };
 
-/**
- * Cập nhật feedback
- * - User: chỉ sửa feedback của mình
- * - Admin: sửa tất cả
- */
-export const updateFeedback = async (
-  id: number,
-  data: {
-    productId: number;
-    content: string;
-    rating: number;
-  }
-) => {
+// 5. Cập nhật feedback (User hoặc Admin)
+export const updateFeedback = async (id: number, data: CreateFeedbackDto) => {
   try {
     const res = await api.put(`/api/Feedback/${id}`, data);
-    toast.success("Cập nhật feedback thành công");
+    toast.success("Cập nhật đánh giá thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Cập nhật feedback thất bại");
-    throw error;
+    return handleFeedbackError(error, "Cập nhật đánh giá thất bại");
   }
 };
 
-/**
- * Xoá feedback
- * - User: chỉ xoá feedback của mình
- * - Admin: xoá tất cả
- */
+// 6. Xoá feedback (User hoặc Admin)
 export const deleteFeedback = async (id: number) => {
   try {
     const res = await api.delete(`/api/Feedback/${id}`);
-    toast.success(res.data?.message || "Xoá feedback thành công");
+    toast.success(res.data?.message || "Đã xóa đánh giá");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Xoá feedback thất bại");
-    throw error;
+    return handleFeedbackError(error, "Xoá đánh giá thất bại");
   }
 };

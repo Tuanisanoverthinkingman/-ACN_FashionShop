@@ -162,7 +162,7 @@ export default function Feedback({
 
       {/* Danh sách feedback */}
       {feedbacks.length === 0 ? (
-        <p className="text-gray-500">Chưa có đánh giá nào 😢</p>
+        <p className="text-gray-500">Chưa có đánh giá nào</p>
       ) : (
         <div className="space-y-4">
           {feedbacks.map((f) => (

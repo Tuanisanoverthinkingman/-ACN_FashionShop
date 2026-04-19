@@ -12,8 +12,16 @@ export interface Category {
   id: number;
   name: string;
   description?: string;
-  imageUrl?: string; // thêm trường imageUrl cho Banner
+  imageUrl?: string; 
 }
+
+// Helper xử lý thông báo lỗi đồng nhất
+const handleCategoryError = (error: any, defaultMsg: string) => {
+  // Ưu tiên lấy message từ Backend: BadRequest(new { message = "..." })
+  const message = error.response?.data?.message || error.response?.data || defaultMsg;
+  toast.error(message);
+  throw error;
+};
 
 // Lấy toàn bộ danh mục
 export const getAllCategories = async (): Promise<Category[]> => {
@@ -21,8 +29,7 @@ export const getAllCategories = async (): Promise<Category[]> => {
     const res = await api.get("/api/categories");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lấy danh mục thất bại");
-    throw error;
+    return handleCategoryError(error, "Lấy danh mục thất bại");
   }
 };
 
@@ -32,8 +39,7 @@ export const getCategoryById = async (id: number): Promise<Category> => {
     const res = await api.get(`/api/categories/${id}`);
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lấy danh mục thất bại");
-    throw error;
+    return handleCategoryError(error, "Lấy thông tin danh mục thất bại");
   }
 };
 
@@ -44,8 +50,7 @@ export const createCategory = async (data: CategoryData) => {
     toast.success("Tạo danh mục thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Tạo danh mục thất bại");
-    throw error;
+    return handleCategoryError(error, "Tạo danh mục thất bại");
   }
 };
 
@@ -56,8 +61,7 @@ export const updateCategory = async (id: number, data: CategoryData) => {
     toast.success(res.data.message || "Cập nhật danh mục thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Cập nhật thất bại");
-    throw error;
+    return handleCategoryError(error, "Cập nhật thất bại");
   }
 };
 
@@ -68,7 +72,6 @@ export const deleteCategory = async (id: number) => {
     toast.success(res.data.message || "Xóa danh mục thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data?.message || "Xóa thất bại");
-    throw error;
+    return handleCategoryError(error, "Xóa thất bại");
   }
 };

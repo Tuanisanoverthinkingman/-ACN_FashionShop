@@ -8,10 +8,10 @@ export const sendOtp = async (email: string) => {
       EmailOrPhone: email,
       IsEmail: true,
     });
-    toast.success(res.data.message || "OTP đã được gửi 📩");
+    toast.success(res.data.message || "OTP đã được gửi");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data || "Gửi OTP thất bại ❌");
+    toast.error(error.response?.data || "Gửi OTP thất bại");
     throw error;
   }
 };
@@ -23,10 +23,10 @@ export const verifyOtp = async (email: string, otp: string) => {
       EmailOrPhone: email,
       Otp: otp,
     });
-    toast.success(res.data.message || "OTP xác thực thành công ✅");
+    toast.success(res.data.message || "OTP xác thực thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data || "OTP không hợp lệ hoặc hết hạn ❌");
+    toast.error(error.response?.data || "OTP không hợp lệ hoặc hết hạn");
     throw error;
   }
 };
@@ -43,10 +43,10 @@ export const resetPasswordWithToken = async (
       ResetToken: resetToken,
       NewPassword: newPassword,
     });
-    toast.success(res.data.message || "Đổi mật khẩu thành công 🎉");
+    toast.success(res.data.message || "Đổi mật khẩu thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data || "Đổi mật khẩu thất bại ❌");
+    toast.error(error.response?.data || "Đổi mật khẩu thất bại");
     throw error;
   }
 };
@@ -57,10 +57,10 @@ export const sendVerificationEmail = async (email: string) => {
     const res = await api.post("/api/EmailAndOTP/send-verification-email", {
       Email: email,
     });
-    toast.success(res.data.message || "Email xác thực đã được gửi 📧");
+    toast.success(res.data.message || "Email xác thực đã được gửi");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data || "Gửi email xác thực thất bại ❌");
+    toast.error(error.response?.data || "Gửi email xác thực thất bại");
     throw error;
   }
 };
@@ -72,10 +72,10 @@ export const verifyEmailToken = async (email: string, token: string) => {
       Email: email,
       Token: token,
     });
-    toast.success(res.data.message || "Xác thực email thành công ✅");
+    toast.success(res.data.message || "Xác thực email thành công");
     return res.data;
   } catch (error: any) {
-    toast.error(error.response?.data || "Xác thực email thất bại ❌");
+    toast.error(error.response?.data || "Xác thực email thất bại");
     throw error;
   }
 };

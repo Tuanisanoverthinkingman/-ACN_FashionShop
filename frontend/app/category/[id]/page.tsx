@@ -4,12 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FaShoppingCart } from "react-icons/fa";
 import { getByCategoryId, Product } from "@/services/product-services";
-import { addToCart } from "@/services/cart-services";
-import { createOrder, orderByProduct } from "@/services/order-services";
 import { getActivePromotions, Promotion, PromotionApplyType } from "@/services/promotion-services";
-
 import { toast } from "react-toastify";
 
 export default function CategoryPage() {
@@ -46,22 +42,24 @@ export default function CategoryPage() {
     if (categoryId) fetchData();
   }, [categoryId]);
 
-  // --- Tính giá giảm ---
-  const getDiscountedPrice = (product: Product) => {
+  // --- Helper: Lấy giá nhỏ nhất của Sản phẩm ---
+  const getMinPrice = (product: Product) => {
+    if (!product.productVariants || product.productVariants.length === 0) return 0;
+    return Math.min(...product.productVariants.map(v => v.price));
+  };
+
+  // --- Tính % giảm giá ---
+  const getDiscountPercent = (product: Product) => {
     const applicablePromos = promotions.filter(promo => {
       switch (promo.applyType) {
-        case PromotionApplyType.General:
-          return false; // General áp dụng cho tất cả sản phẩm
-        case PromotionApplyType.Product:
-          return promo.productIds?.includes(product.id);
-        case PromotionApplyType.Category:
-          return promo.categoryIds?.includes(product.categoryId);
-        default:
-          return false;
+        case PromotionApplyType.General: return true;
+        case PromotionApplyType.Product: return promo.productIds?.includes(product.id);
+        case PromotionApplyType.Category: return promo.categoryIds?.includes(product.categoryId);
+        default: return false;
       }
     });
-    const maxDiscount = applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
-    return product.price * (1 - maxDiscount / 100);
+    if (applicablePromos.length === 0) return 0;
+    return applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
   };
 
   // --- Filter + Search + Sort ---
@@ -72,44 +70,17 @@ export default function CategoryPage() {
       result = result.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
 
-    if (sortOption === "price-asc") result.sort((a, b) => a.price - b.price);
-    else if (sortOption === "price-desc") result.sort((a, b) => b.price - a.price);
+    if (sortOption === "price-asc") result.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+    else if (sortOption === "price-desc") result.sort((a, b) => getMinPrice(b) - getMinPrice(a));
 
     return result;
   }, [products, searchTerm, sortOption]);
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-const currentProducts = filteredProducts.slice(
+  const currentProducts = filteredProducts.slice(
     (currentPage - 1) * PRODUCTS_PER_PAGE,
     currentPage * PRODUCTS_PER_PAGE
   );
-
-  // --- Thêm vào giỏ ---
-  const handleAddToCart = async (productId: number) => {
-    try {
-      await addToCart({ productId, quantity: 1 });
-      toast.success("Đã thêm vào giỏ hàng 🎉");
-      window.dispatchEvent(new Event("cartChanged"));
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Thêm vào giỏ hàng thất bại 😢");
-    }
-  };
-
-  // --- Mua ngay (Order trực tiếp bằng ProductId) ---
-  const handleBuyNow = async (productId: number) => {
-    try {
-      const order = await orderByProduct(productId, 1);
-
-      toast.success("Mua ngay thành công 🎉");
-      window.dispatchEvent(new Event("cartChanged"));
-
-      router.push(`/checkout/${order.orderId}`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Mua ngay thất bại 😢");
-    }
-  };
 
   if (loading) {
     return (
@@ -124,12 +95,12 @@ const currentProducts = filteredProducts.slice(
   }
 
   return (
-    <section className="pt-[120px] pb-32 bg-gray-50 min-h-screen">
+    <section className="pt-[120px] pb-32 bg-gray-50 min-h-screen font-['Times_New_Roman']">
       <div className="max-w-7xl mx-auto px-4">
         <h2 className="text-3xl font-bold text-center mb-8 text-gray-800">Danh mục sản phẩm</h2>
 
         {/* Search + Sort */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 bg-gray-50 z-10 px-4 py-2 rounded-lg shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 px-4 py-2">
           <input
             type="text"
             placeholder="🔍 Tìm kiếm sản phẩm..."
@@ -150,12 +121,14 @@ const currentProducts = filteredProducts.slice(
 
         {/* Product Grid */}
         {currentProducts.length === 0 ? (
-          <p className="text-center text-gray-500 italic">Không có sản phẩm nào phù hợp 🥺</p>
+          <p className="text-center text-gray-500 italic py-20">Không có sản phẩm nào phù hợp 🥺</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentProducts.map(product => {
-const discountedPrice = getDiscountedPrice(product);
-              const hasDiscount = discountedPrice < product.price;
+              const basePrice = getMinPrice(product);
+              const discountPercent = getDiscountPercent(product);
+              const discountedPrice = basePrice * (1 - discountPercent / 100);
+              const hasDiscount = discountPercent > 0;
 
               return (
                 <motion.div
@@ -163,9 +136,15 @@ const discountedPrice = getDiscountedPrice(product);
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col h-full"
+                  className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col h-full relative border border-gray-100"
                 >
-                  <Link href={`/product/${product.id}`} className="block">
+                  {hasDiscount && (
+                    <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md z-10">
+                      -{discountPercent}%
+                    </div>
+                  )}
+
+                  <Link href={`/product/${product.id}`} className="block overflow-hidden">
                     <img
                       src={product.imageUrl || "/images/default.jpg"}
                       alt={product.name}
@@ -173,35 +152,25 @@ const discountedPrice = getDiscountedPrice(product);
                     />
                   </Link>
 
-                  <div className="p-5 flex flex-col flex-1">
-                    <h3 className="font-semibold text-lg text-gray-800 mb-2 line-clamp-2">{product.name}</h3>
+                  <div className="p-5 flex flex-col flex-1 pb-8">
+                    <Link href={`/product/${product.id}`}>
+                      <h3 className="font-semibold text-lg text-gray-800 mb-2 line-clamp-2 hover:text-blue-600 transition-colors">
+                        {product.name}
+                      </h3>
+                    </Link>
                     <p className="text-gray-500 text-sm mb-3 line-clamp-3">{product.description || "Không có mô tả."}</p>
-                    <p className="text-xl font-bold text-gray-800 mb-3">
-                      {hasDiscount ? (
-                        <>
-                          <span className="line-through text-gray-400 mr-2">{product.price.toLocaleString()}₫</span>
-                          <span className="text-red-500">{discountedPrice.toLocaleString()}₫</span>
-                        </>
-                      ) : (
-                        <span>{product.price.toLocaleString()}₫</span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="px-5 pb-5 mt-auto flex flex-col gap-2">
-                    <button
-                      onClick={() => handleAddToCart(product.id)}
-                      className="w-full flex rounded-lg overflow-hidden border border-gray-300 hover:shadow-md transition"
-                    >
-                      <span className="flex-[3] bg-white px-4 py-2 text-black font-semibold text-center">Thêm vào giỏ hàng</span>
-                      <span className="flex-[1] bg-blue-400 text-white flex items-center justify-center"><FaShoppingCart /></span>
-                    </button>
-                    <button
-                      onClick={() => handleBuyNow(product.id)}
-                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-                    >
-                      Mua ngay 💳
-                    </button>
+                    <div className="mt-auto">
+                      <p className="text-xl font-bold flex items-center gap-2">
+                        {hasDiscount ? (
+                          <>
+                            <span className="text-red-500">{discountedPrice.toLocaleString()}₫</span>
+                            <span className="line-through text-gray-400 text-sm font-normal">{basePrice.toLocaleString()}₫</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-800">{basePrice.toLocaleString()}₫</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -211,10 +180,10 @@ const discountedPrice = getDiscountedPrice(product);
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center gap-2 mt-8">
+          <div className="flex justify-center gap-2 mt-12">
             <button
               disabled={currentPage === 1}
-onClick={() => setCurrentPage(prev => prev - 1)}
+              onClick={() => setCurrentPage(prev => prev - 1)}
               className="px-4 py-2 border rounded-full disabled:opacity-50 hover:bg-blue-50 transition"
             >
               Trang trước
@@ -223,7 +192,9 @@ onClick={() => setCurrentPage(prev => prev - 1)}
               <button
                 key={idx}
                 onClick={() => setCurrentPage(idx + 1)}
-                className={`px-4 py-2 border rounded-full ${currentPage === idx + 1 ? "bg-blue-600 text-white" : "hover:bg-blue-50"} transition`}
+                className={`w-10 h-10 border rounded-full flex items-center justify-center transition ${
+                  currentPage === idx + 1 ? "bg-blue-600 text-white border-blue-600" : "hover:bg-blue-50"
+                }`}
               >
                 {idx + 1}
               </button>

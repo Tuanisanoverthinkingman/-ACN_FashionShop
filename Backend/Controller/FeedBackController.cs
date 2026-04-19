@@ -8,7 +8,6 @@ namespace Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-
     public class FeedbackController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -18,37 +17,44 @@ namespace Controllers
             _context = context;
         }
 
-        // Lấy UserId và Role từ JWT
+        // Helper lấy UserId và Role
         private (int userId, string role) GetUserInfo()
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            var role = User.FindFirstValue(ClaimTypes.Role);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = string.IsNullOrEmpty(userIdStr) ? 0 : int.Parse(userIdStr);
+            var role = User.FindFirstValue(ClaimTypes.Role) ?? "";
             return (userId, role);
         }
 
-        // GET: api/Feedback
+        // GET: api/Feedback (Dành cho trang Quản lý của User hoặc Admin)
         [HttpGet]
+        [Authorize]
         public async Task<IActionResult> GetAll()
         {
             var (userId, role) = GetUserInfo();
 
             IQueryable<Feedback> query = _context.Feedbacks
+                .IgnoreQueryFilters() 
                 .Include(f => f.User)
                 .Include(f => f.Product);
 
             if (role != "Admin")
+            {
                 query = query.Where(f => f.UserId == userId);
+            }
 
-            var feedbacks = await query.ToListAsync();
+            var feedbacks = await query.OrderByDescending(f => f.CreatedAt).ToListAsync();
             return Ok(feedbacks);
         }
 
+        // GET: api/Feedback/product/{productId} (Dành cho trang chi tiết sản phẩm - Client)
         [HttpGet("product/{productId}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetByProduct(int productId)
         {
             var feedbacks = await _context.Feedbacks
-                .Where(f => f.ProductId == productId)
+                .Include(f => f.Product)
+                .Where(f => f.ProductId == productId && !f.Product.IsDeleted)
                 .Include(f => f.User)
                 .Select(f => new
                 {
@@ -57,22 +63,24 @@ namespace Controllers
                     f.Rating,
                     f.ProductId,
                     f.UserId,
-                    UserName = f.User.FullName
+                    UserName = f.User.FullName,
+                    f.CreatedAt
                 })
+                .OrderByDescending(f => f.Id)
                 .ToListAsync();
 
             return Ok(feedbacks);
         }
 
-        // POST: api/Feedback
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> Create([FromBody] CreateFeedbackDto dto)
         {
-            var (userId, role) = GetUserInfo();
+            var (userId, _) = GetUserInfo();
 
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var product = await _context.products.FindAsync(dto.ProductId);
+            if (product == null || product.IsDeleted)
+                return BadRequest(new { message = "Sản phẩm không tồn tại hoặc đã ngừng kinh doanh." });
 
             var feedback = new Feedback
             {
@@ -86,10 +94,10 @@ namespace Controllers
             _context.Feedbacks.Add(feedback);
             await _context.SaveChangesAsync();
 
-            return Ok(feedback);
+            return Ok(new { message = "Gửi đánh giá thành công!", feedback });
         }
 
-        // PUT: api/Feedback/5
+        // PUT: api/Feedback/{id} (Cập nhật đánh giá)
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateFeedbackDto dto)
@@ -98,22 +106,21 @@ namespace Controllers
 
             var existing = await _context.Feedbacks.FindAsync(id);
             if (existing == null)
-                return NotFound("Feedback không tìm thấy");
+                return NotFound("Không tìm thấy đánh giá này.");
 
-            // User chỉ sửa feedback của mình, Admin được sửa tất cả
+            // Chỉ chủ nhân hoặc Admin mới được sửa
             if (role != "Admin" && existing.UserId != userId)
-                return Forbid("Bạn không thể sửa feedback");
+                return Forbid();
 
             existing.Content = dto.Content;
             existing.Rating = dto.Rating;
-            existing.ProductId = dto.ProductId;
             existing.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return Ok(existing);
+            return Ok(new { message = "Cập nhật thành công", feedback = existing });
         }
 
-        // DELETE: api/Feedback/5
+        // DELETE: api/Feedback/{id} (Xóa đánh giá)
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> Delete(int id)
@@ -122,29 +129,27 @@ namespace Controllers
 
             var feedback = await _context.Feedbacks.FindAsync(id);
             if (feedback == null)
-                return NotFound("Feedback not found");
+                return NotFound("Đánh giá không tồn tại.");
 
-            // User chỉ xoá feedback của mình, Admin được xoá tất cả
             if (role != "Admin" && feedback.UserId != userId)
-                return Forbid("Bạn không thể xoá feedback");
+                return Forbid();
 
             _context.Feedbacks.Remove(feedback);
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Feedback xoá thành công" });
+            return Ok(new { message = "Đã xóa đánh giá." });
         }
     }
+
     public class CreateFeedbackDto
     {
-        public string Content { get; set; }
-
+        public string Content { get; set; } = string.Empty;
         public int Rating { get; set; }
-
         public int ProductId { get; set; }
     }
+
     public class UpdateFeedbackDto
     {
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
         public int Rating { get; set; }
-        public int ProductId { get; set; }
     }
 }

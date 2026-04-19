@@ -4,10 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { FaShoppingCart, FaFire } from "react-icons/fa";
+import { FaFire } from "react-icons/fa";
 import { Product, getSaleProducts } from "@/services/product-services";
 import { Category } from "@/services/category-services";
-import { addToCart } from "@/services/cart-services";
 import { Promotion, PromotionApplyType, getActivePromotions } from "@/services/promotion-services";
 
 export default function SalePage() {
@@ -76,6 +75,13 @@ export default function SalePage() {
     fetchData();
   }, [keyword]);
 
+  // --- Helper: Lấy giá nhỏ nhất của Sản phẩm ---
+  const getMinPrice = (product: Product) => {
+    if (!product.productVariants || product.productVariants.length === 0) return 0;
+    return Math.min(...product.productVariants.map(v => v.price));
+  };
+
+  // --- Filter + Search + Sort ---
   const filteredProducts = useMemo(() => {
     let result = [...products];
     if (selectedCategory !== "all") {
@@ -84,8 +90,11 @@ export default function SalePage() {
     if (searchTerm.trim() !== "") {
       result = result.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
-    if (sortOption === "price-asc") result.sort((a, b) => a.price - b.price);
-    else if (sortOption === "price-desc") result.sort((a, b) => b.price - a.price);
+    
+    // So sánh dựa trên giá Min
+    if (sortOption === "price-asc") result.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+    else if (sortOption === "price-desc") result.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+    
     return result;
   }, [products, selectedCategory, searchTerm, sortOption]);
 
@@ -99,7 +108,8 @@ export default function SalePage() {
     setCurrentPage(1);
   }, [filteredProducts.length]);
 
-  const getDiscountedPrice = (product: Product) => {
+  // --- Tính % giảm giá ---
+  const getDiscountPercent = (product: Product) => {
     const applicablePromos = promotions.filter(promo => {
       switch (promo.applyType) {
         case PromotionApplyType.General: return true;
@@ -108,21 +118,9 @@ export default function SalePage() {
         default: return false;
       }
     });
-    if (applicablePromos.length === 0) return product.price;
+    if (applicablePromos.length === 0) return 0;
 
-    const maxDiscount = applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
-    return product.price * (1 - maxDiscount / 100);
-  };
-
-  const handleAddToCart = async (productId: number) => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return window.location.href = "/login";
-      await addToCart({ productId, quantity: 1 });
-      window.dispatchEvent(new Event("cartChanged"));
-    } catch {
-      alert("Thêm vào giỏ hàng thất bại");
-    }
+    return applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
   };
 
   const getPageNumbers = () => {
@@ -194,7 +192,7 @@ export default function SalePage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <input
               type="text"
-              placeholder="🔍 Tìm kiếm sản phẩm Sale..."
+              placeholder="Tìm kiếm sản phẩm Sale..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full md:w-1/2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#242424] text-gray-900 dark:text-white rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors duration-300"
@@ -219,8 +217,9 @@ export default function SalePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentProducts.map((product) => {
-              const discountedPrice = getDiscountedPrice(product);
-              const maxDiscountPercent = Math.round((1 - discountedPrice / product.price) * 100);
+              const basePrice = getMinPrice(product);
+              const maxDiscountPercent = getDiscountPercent(product);
+              const discountedPrice = basePrice * (1 - maxDiscountPercent / 100);
 
               return (
                 <motion.div
@@ -228,7 +227,7 @@ export default function SalePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-white dark:bg-[#242424] rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col h-full relative border border-gray-100 dark:border-gray-800"
+                  className="bg-white dark:bg-[#242424] rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col h-full relative border border-gray-100 dark:border-gray-800 group"
                 >
                   {maxDiscountPercent > 0 && (
                     <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-sm">
@@ -244,31 +243,25 @@ export default function SalePage() {
                     />
                   </Link>
 
-                  <div className="p-5 flex flex-col flex-1">
-                    <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-2 line-clamp-2 transition-colors duration-300">{product.name}</h3>
+                  <div className="p-5 flex flex-col flex-1 pb-6">
+                    <Link href={`/product/${product.id}`}>
+                      <h3 className="font-semibold text-lg text-gray-800 dark:text-white mb-2 line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">
+                        {product.name}
+                      </h3>
+                    </Link>
                     <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-3 transition-colors duration-300">{product.description || "Không có mô tả."}</p>
-                    <div className="mt-auto">
-                      <p className="text-xl font-bold mb-3 flex items-center gap-2">
+                    <div className="mt-auto pt-2">
+                      <p className="text-xl font-bold flex items-center gap-2">
                         {maxDiscountPercent > 0 ? (
                           <>
                             <span className="text-red-500 dark:text-red-400">{discountedPrice.toLocaleString()}₫</span>
-                            <span className="line-through text-gray-400 dark:text-gray-500 text-sm font-normal">{product.price.toLocaleString()}₫</span>
+                            <span className="line-through text-gray-400 dark:text-gray-500 text-sm font-normal">{basePrice.toLocaleString()}₫</span>
                           </>
                         ) : (
-                          <span className="text-gray-800 dark:text-gray-200">{product.price.toLocaleString()}₫</span>
+                          <span className="text-gray-800 dark:text-gray-200">{basePrice.toLocaleString()}₫</span>
                         )}
                       </p>
                     </div>
-                  </div>
-
-                  <div className="px-5 pb-5 mt-auto">
-                    <button
-                      onClick={() => handleAddToCart(product.id)}
-                      className="w-full flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 hover:shadow-md transition"
-                    >
-                      <span className="flex-[3] bg-white dark:bg-[#1a1a1a] px-4 py-2 text-black dark:text-white font-semibold text-center hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors">Thêm vào giỏ</span>
-                      <span className="flex-[1] bg-blue-400 dark:bg-blue-600 text-white flex items-center justify-center transition-colors"><FaShoppingCart /></span>
-                    </button>
                   </div>
                 </motion.div>
               );
