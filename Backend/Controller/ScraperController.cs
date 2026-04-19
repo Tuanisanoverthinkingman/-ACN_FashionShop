@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Models;
 using Newtonsoft.Json.Linq;
 using HtmlAgilityPack;
+using System.Text.RegularExpressions;
 
 namespace Controllers
 {
@@ -13,12 +14,11 @@ namespace Controllers
         private readonly AppDbContext _context;
         private readonly HttpClient _httpClient;
 
-        // TỐI ƯU 1: Inject HttpClient qua Dependency Injection để tránh cạn kiệt kết nối (Socket Exhaustion)
         public ScraperController(AppDbContext context, HttpClient httpClient)
         {
             _context = context;
             _httpClient = httpClient;
-
+            _httpClient.Timeout = TimeSpan.FromMinutes(10);
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             _httpClient.DefaultRequestHeaders.Add("Referer", "https://yame.vn");
         }
@@ -28,177 +28,176 @@ namespace Controllers
         {
             try
             {
-                // Kéo danh sách category và product hiện có lên RAM (CHỈ 1 LẦN TRƯỚC VÒNG LẶP)
                 var existingCategories = await _context.categories.ToListAsync();
                 var categoryDict = existingCategories.ToDictionary(c => c.Name, c => c.Id);
-                var existingCategoryNames = existingCategories.Select(c => c.Name).ToHashSet();
 
-                var existingProductNames = await _context.products.Select(p => p.Name).ToHashSetAsync();
-                var newProducts = new List<Product>();
+                var dbProducts = await _context.products.Include(p => p.ProductVariants).ToListAsync();
+                var newProductsInMemory = new List<Product>();
 
                 int page = 1;
                 int totalFetched = 0;
                 bool hasMoreData = true;
 
-                // Vòng lặp cào từng trang
-                while (hasMoreData && totalFetched < 1400) // Giới hạn lấy 1400 sản phẩm
+                while (hasMoreData && totalFetched < 1400)
                 {
-                    // Thêm tham số page vào URL
                     string url = $"https://yame.vn/products.json?limit=250&page={page}";
-
                     var response = await _httpClient.GetAsync(url);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        // Nếu lỗi ở trang đầu thì báo lỗi, nếu ở trang sau thì thoát vòng lặp
-                        if (page == 1) return StatusCode((int)response.StatusCode, "Failed to fetch data");
-                        break;
-                    }
+                    if (!response.IsSuccessStatusCode) break;
 
                     var content = await response.Content.ReadAsStringAsync();
                     var json = JObject.Parse(content);
                     var productsArray = json["products"] as JArray;
 
-                    // Nếu mảng rỗng -> Đã cào đến trang cuối cùng -> Thoát vòng lặp
-                    if (productsArray == null || !productsArray.Any())
-                    {
-                        hasMoreData = false;
-                        break;
-                    }
+                    if (productsArray == null || !productsArray.Any()) break;
 
-                    // XỬ LÝ DANH MỤC MỚI TRONG TRANG NÀY
-                    var jsonCategoryNames = productsArray
-                        .Select(p => p["product_type"]?.ToString())
-                        .Where(name => !string.IsNullOrEmpty(name))
-                        .Distinct()
-                        .ToList();
-
-                    var newCategoriesThisPage = jsonCategoryNames
-                        .Where(name => !existingCategoryNames.Contains(name))
-                        .Select(name => new Category { Name = name, Description = name })
-                        .ToList();
-
-                    if (newCategoriesThisPage.Any())
-                    {
-                        _context.categories.AddRange(newCategoriesThisPage);
-                        await _context.SaveChangesAsync();
-
-                        foreach (var cat in newCategoriesThisPage)
-                        {
-                            categoryDict[cat.Name] = cat.Id;
-                            existingCategoryNames.Add(cat.Name);
-                        }
-                    }
-
-                    // DỰNG DATA SẢN PHẨM Ở BỘ NHỚ TẠM
                     foreach (var item in productsArray)
                     {
-                        string productName = item["title"]?.ToString() ?? "No Name";
+                        string fullTitle = item["title"]?.ToString() ?? "No Name";
 
-                        if (existingProductNames.Contains(productName))
-                            continue;
+                        string baseName = fullTitle;
+                        string[] rácKeywords = { " Màu ", " - ", " | ", " #Y", " Dáng ", " mẫu ", " size ", " F3", " F4" };
 
-                        string categoryName = item["product_type"]?.ToString() ?? "Khác";
-                        int categoryId = categoryDict.TryGetValue(categoryName, out int id) ? id : existingCategories.FirstOrDefault()?.Id ?? 0;
-
-                        var imagesArray = item["images"] as JArray;
-                        string? imageUrl = (imagesArray != null && imagesArray.Count > 0)
-                                           ? imagesArray[0]["src"]?.ToString()
-                                           : null;
-
-                        // Xử lý mô tả
-                        string html = item["body_html"]?.ToString() ?? "";
-                        var doc = new HtmlDocument();
-                        doc.LoadHtml(html);
-                        string plainDescription = doc.DocumentNode.InnerText;
-                        if (plainDescription.Length > 4000) plainDescription = plainDescription.Substring(0, 4000);
-
-                        // 1. Tạo đối tượng Product (Thông tin chung)
-                        var product = new Product
+                        foreach (var keyword in rácKeywords)
                         {
-                            Name = productName,
-                            Description = plainDescription,
-                            ImageUrl = imageUrl,
-                            CategoryId = categoryId,
-                            ProductVariants = new List<ProductVariant>() // Khởi tạo list để chứa các size/màu
-                        };
-
-                        // 2. Lặp qua TẤT CẢ các biến thể của sản phẩm này
-                        var optionsArray = item["options"] as JArray;
-                        string sizeOptionKey = "option2"; // Giá trị dự phòng mặc định
-                        string colorOptionKey = "option1"; // Giá trị dự phòng mặc định
-
-                        if (optionsArray != null)
-                        {
-                            for (int i = 0; i < optionsArray.Count; i++)
+                            int index = baseName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase);
+                            if (index > 0)
                             {
-                                string optionName = optionsArray[i]["name"]?.ToString().ToLower() ?? "";
+                                baseName = baseName.Substring(0, index);
+                            }
+                        }
+                        baseName = baseName.Trim();
 
-                                // Nếu tên option chứa chữ "kích thước", "size" thì nó nằm ở option(i+1)
-                                if (optionName.Contains("kích") || optionName.Contains("size"))
-                                {
-                                    sizeOptionKey = $"option{i + 1}";
-                                }
-                                // Nếu tên option chứa chữ "màu", "color"
-                                else if (optionName.Contains("màu") || optionName.Contains("color"))
-                                {
-                                    colorOptionKey = $"option{i + 1}";
-                                }
+                        string colorKey = "";
+                        string sizeKey = "";
+                        var options = item["options"] as JArray;
+                        if (options != null)
+                        {
+                            for (int i = 0; i < options.Count; i++)
+                            {
+                                string optName = options[i]["name"]?.ToString().ToLower() ?? "";
+                                if (optName.Contains("màu") || optName.Contains("color")) colorKey = $"option{i + 1}";
+                                if (optName.Contains("kích") || optName.Contains("size")) sizeKey = $"option{i + 1}";
                             }
                         }
 
-                        // 2. Lặp qua TẤT CẢ các biến thể của sản phẩm này
+                        var imagesArray = item["images"] as JArray;
+                        string? variantImg = (imagesArray != null && imagesArray.Count > 0)
+                                            ? imagesArray[0]["src"]?.ToString() : null;
+
+                        var targetProduct = dbProducts.FirstOrDefault(p => p.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                                          ?? newProductsInMemory.FirstOrDefault(p => p.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase));
+
+                        if (targetProduct == null)
+                        {
+                            string? rawCategory = item["product_type"]?.ToString();
+                            string categoryName = string.IsNullOrWhiteSpace(rawCategory) ? "Khác" : rawCategory.Trim();
+                            if (!categoryDict.ContainsKey(categoryName))
+                            {
+                                var newCat = new Category { Name = categoryName, Description = categoryName };
+                                _context.categories.Add(newCat);
+                                await _context.SaveChangesAsync();
+                                categoryDict[categoryName] = newCat.Id;
+                            }
+
+                            string html = item["body_html"]?.ToString() ?? "";
+                            var doc = new HtmlDocument(); doc.LoadHtml(html);
+                            string plainDescription = doc.DocumentNode.InnerText;
+                            if (plainDescription.Length > 4000) plainDescription = plainDescription.Substring(0, 4000);
+
+                            targetProduct = new Product
+                            {
+                                Name = baseName,
+                                Description = plainDescription,
+                                ImageUrl = variantImg,
+                                CategoryId = categoryDict[categoryName],
+                                ProductVariants = new List<ProductVariant>()
+                            };
+                            newProductsInMemory.Add(targetProduct);
+                        }
+
                         var variantsArray = item["variants"] as JArray;
                         if (variantsArray != null)
                         {
-                            foreach (var variant in variantsArray)
+                            foreach (var v in variantsArray)
                             {
-                                decimal price = decimal.TryParse(variant["price"]?.ToString(), out var p) ? p : 0;
-                                decimal costPrice = price * 0.7m; // Giá nhập = 70% giá bán
+                                string colorValue = !string.IsNullOrEmpty(colorKey) ? v[colorKey]?.ToString() : "";
+                                string sizeValue = !string.IsNullOrEmpty(sizeKey) ? v[sizeKey]?.ToString() : "";
 
-                                // LOGIC MỚI: Lấy giá trị dựa trên Key đã phân tích được ở trên
-                                string size = variant[sizeOptionKey]?.ToString() ?? "FreeSize";
-                                string color = variant[colorOptionKey]?.ToString() ?? "Mặc định";
+                                if (string.IsNullOrWhiteSpace(colorValue) || colorValue.ToLower() == "default title")
+                                    colorValue = GuessColorFromText(fullTitle);
 
-                                // Dọn dẹp dữ liệu (Tránh trường hợp bị rỗng)
-                                if (string.IsNullOrWhiteSpace(size)) size = "FreeSize";
-                                if (string.IsNullOrWhiteSpace(color)) color = "Mặc định";
+                                if (string.IsNullOrWhiteSpace(sizeValue))
+                                    sizeValue = GuessSizeFromText(fullTitle);
 
-                                int stock = int.TryParse(variant["inventory_quantity"]?.ToString(), out var qty) ? qty : Random.Shared.Next(10, 50);
+                                colorValue = colorValue.Split('/')[0].Trim();
+                                sizeValue = sizeValue.Split('/').Last().Trim();
 
-                                product.ProductVariants.Add(new ProductVariant
+                                decimal price = decimal.TryParse(v["price"]?.ToString(), out var p) ? p : 0;
+
+                                if (!targetProduct.ProductVariants.Any(pv => pv.Color == colorValue && pv.Size == sizeValue))
                                 {
-                                    Color = color,
-                                    Size = size,
-                                    Price = price,
-                                    CostPrice = costPrice,
-                                    Instock = stock
-                                });
+                                    targetProduct.ProductVariants.Add(new ProductVariant
+                                    {
+                                        Color = colorValue,
+                                        Size = sizeValue,
+                                        Price = price,
+                                        CostPrice = price * 0.7m,
+                                        Instock = Random.Shared.Next(20, 100),
+                                        ImageUrl = variantImg
+                                    });
+                                }
                             }
                         }
-
-                        newProducts.Add(product);
-                        existingProductNames.Add(productName);
                     }
+
                     totalFetched += productsArray.Count;
-                    page++; // Chuyển sang trang tiếp theo
+                    page++;
 
-                    // Nghỉ 1 chút giữa các request để tránh bị server block (Polite Scraping)
-                    await Task.Delay(500);
+                    // --- ĐÂY LÀ PHẦN MÌNH THÊM VÀO: LƯU ĐỊNH KỲ ---
+                    if (newProductsInMemory.Any())
+                    {
+                        _context.products.AddRange(newProductsInMemory);
+                        await _context.SaveChangesAsync();
+
+                        // Xóa sạch bộ nhớ tạm sau khi đã lưu DB thành công
+                        newProductsInMemory.Clear();
+
+                        // Cập nhật lại danh sách gốc để các vòng lặp sau biết sản phẩm đã tồn tại
+                        dbProducts = await _context.products.Include(p => p.ProductVariants).ToListAsync();
+                    }
+                    // ----------------------------------------------
+
+                    await Task.Delay(300);
                 }
 
-                // NHẬP KHO HÀNG LOẠT (Bulk Insert)
-                if (newProducts.Any())
-                {
-                    _context.products.AddRange(newProducts);
-                    await _context.SaveChangesAsync();
-                }
-
-                return Ok(new { message = $"Thành công! Đã quét {totalFetched} SP từ nguồn, lưu mới {newProducts.Count} sản phẩm." });
+                // Trả về thông báo thành công (không cần _context.products.AddRange ở đây nữa)
+                return Ok(new { message = $"Hoàn tất! Đã quét tổng cộng {totalFetched} biến thể và lưu an toàn vào Database." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Lỗi hệ thống: {ex.Message}");
+                var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, $"Lỗi: {inner}");
             }
+        }
+
+        private string GuessColorFromText(string text)
+        {
+            string[] colors = { "Đen", "Trắng", "Xám", "Đỏ", "Xanh", "Vàng", "Nâu", "Be", "Hồng", "Tím", "Cam", "Rêu" };
+            foreach (var color in colors)
+            {
+                if (text.Contains(color, StringComparison.OrdinalIgnoreCase)) return color;
+            }
+            return "Mặc định";
+        }
+
+        private string GuessSizeFromText(string text)
+        {
+            string[] commonSizes = { "S", "M", "L", "XL", "XXL", "2XL", "3XL" };
+            foreach (var s in commonSizes)
+            {
+                if (Regex.IsMatch(text, $@"\b{s}\b", RegexOptions.IgnoreCase)) return s;
+            }
+            return "FreeSize";
         }
     }
 }

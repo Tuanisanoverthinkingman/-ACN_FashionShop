@@ -18,7 +18,7 @@ namespace Models
         [Column(TypeName = "longtext")]
         public string Description { get; set; }
 
-        [Column(TypeName = "nvarchar(255)")]
+        [Column(TypeName = "longtext")]
         public string? ImageUrl { get; set; }
 
         public bool IsDeleted { get; set; } = false;

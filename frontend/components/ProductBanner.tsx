@@ -186,6 +186,10 @@ export default function ProductBanner() {
               const maxDiscountPercent = getDiscountPercent(product);
               const discountedPrice = basePrice * (1 - maxDiscountPercent / 100);
 
+              // Lọc và đếm số lượng màu sắc duy nhất (loại bỏ giá trị rỗng hoặc "Mặc định")
+              const uniqueColors = Array.from(new Set(product.productVariants?.map(v => v.color))).filter(c => c && c !== "Mặc định");
+              const colorCount = uniqueColors.length;
+
               return (
                 <motion.div
                   key={product.id}
@@ -215,6 +219,20 @@ export default function ProductBanner() {
                         {product.name}
                       </h3>
                     </Link>
+
+                    {/* Hiển thị badge đếm số lượng màu sắc */}
+                    <div className="flex items-center mb-2">
+                      {colorCount > 0 ? (
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md">
+                          {colorCount} màu sắc
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md">
+                          1 màu
+                        </span>
+                      )}
+                    </div>
+
                     <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-3 transition-colors duration-300">{product.description || "Không có mô tả."}</p>
                     <div className="mt-auto">
                       <p className="text-xl font-bold flex items-center gap-2">

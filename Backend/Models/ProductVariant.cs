@@ -20,10 +20,11 @@ namespace Models
         [Column(TypeName = "nvarchar(50)")]
         public string? Size { get; set; }
 
-        [StringLength(50)]
-        [Column(TypeName = "nvarchar(50)")]
+        [StringLength(255)]
+        [Column(TypeName = "nvarchar(255)")]
         public string? Color { get; set; }
 
+        [Column(TypeName = "longtext")]
         public string? ImageUrl { get; set; }
 
         [Required]

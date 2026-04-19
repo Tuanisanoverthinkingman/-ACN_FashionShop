@@ -66,8 +66,6 @@ export default function NavBar() {
   const cartCount = useCartCount();
   const [showMenu, setShowMenu] = useState(false);
 
-  // --- LOGIC MÀU NAVBAR (Dùng thuần Tailwind, không phụ thuộc cuộn) ---
-  // Mặc định là Trắng, thêm dark:... để chuyển Đen khi ở chế độ Tối
   const navBgClass = "bg-white dark:bg-[#1a1814] text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 shadow-sm";
 
   // --- CẤU HÌNH MÀU MEGA MENU VÀ NỘI DUNG BÊN TRONG ---
@@ -209,7 +207,7 @@ export default function NavBar() {
                       </h4>
                       <ul className="space-y-3">
                         <li><Link href="/category/3" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Thun Tay Ngắn</Link></li>
-                        <li><Link href="/category/10" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Thun Tay Dài</Link></li>
+                        <li><Link href="/category/13" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Thun Tay Dài</Link></li>
                         <li><Link href="/category/18" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Thun 3 Lỗ</Link></li>
                       </ul>
                     </div>
@@ -220,7 +218,8 @@ export default function NavBar() {
                         Áo Polo
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/11" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Polo Tay Ngắn</Link></li>
+                        <li><Link href="/category/14" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Polo Tay Ngắn</Link></li>
+                        <li><Link href="/category/47" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Polo Tay Dài</Link></li>
                       </ul>
                     </div>
 
@@ -231,7 +230,7 @@ export default function NavBar() {
                       </h4>
                       <ul className="space-y-3">
                         <li><Link href="/category/15" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Sơ Mi Tay Ngắn</Link></li>
-                        <li><Link href="/category/13" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Sơ Mi Tay Dài</Link></li>
+                        <li><Link href="/category/26" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Sơ Mi Tay Dài</Link></li>
                         <li><Link href="/category/25" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Sơ Mi Khoác</Link></li>
                       </ul>
                     </div>
@@ -242,10 +241,13 @@ export default function NavBar() {
                         Áo Khoác
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/21" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Parka</Link></li>
-                        <li><Link href="/category/1" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Jean</Link></li>
-                        <li><Link href="/category/8" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Kaki</Link></li>
+                        <li><Link href="/category/5" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Jean</Link></li>
+                        <li><Link href="/category/11" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Kaki</Link></li>
                         <li><Link href="/category/19" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Hoodie</Link></li>
+                        <li><Link href="/category/21" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Parka</Link></li>
+                        <li><Link href="/category/51" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Bomber</Link></li>
+                        <li><Link href="/category/54" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Thể Thao</Link></li>
+                        <li><Link href="/category/83" className={`text-sm transition-colors duration-200 ${linkClass}`}>Áo Khoác Dù</Link></li>
                       </ul>
                     </div>
                   </div>
@@ -262,7 +264,7 @@ export default function NavBar() {
                         Quần Dài
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/2" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Kaki</Link></li>
+                        <li><Link href="/category/6" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Kaki</Link></li>
                         <li><Link href="/category/17" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Tây</Link></li>
                         <li><Link href="/category/20" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Jogger</Link></li>
                       </ul>
@@ -274,7 +276,10 @@ export default function NavBar() {
                         Quần Jeans
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/12" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Jeans Regular Fit</Link></li>
+                        <li><Link href="/category/2" className={`text-sm transition-colors duration-200 ${linkClass}`}>Jeans Regular Fit</Link></li>
+                        <li><Link href="/category/60" className={`text-sm transition-colors duration-200 ${linkClass}`}>Jeans Loose Fit</Link></li>
+                        <li><Link href="/category/65" className={`text-sm transition-colors duration-200 ${linkClass}`}>Jeans Slim Fit</Link></li>
+                        <li><Link href="/category/50" className={`text-sm transition-colors duration-200 ${linkClass}`}>Jeans Jogger</Link></li>
                       </ul>
                     </div>
 
@@ -285,9 +290,11 @@ export default function NavBar() {
                       </h4>
                       <ul className="space-y-3">
                         <li><Link href="/category/16" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Kaki</Link></li>
-                        <li><Link href="/category/29" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Jeans Short</Link></li>
-                        <li><Link href="/category/32" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Dù</Link></li>
-                        <li><Link href="/category/41" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Thun</Link></li>
+                        <li><Link href="/category/30" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Jeans Short</Link></li>
+                        <li><Link href="/category/33" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Dù</Link></li>
+                        <li><Link href="/category/42" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Thun</Link></li>
+                        <li><Link href="/category/46" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Cargo</Link></li>
+                        <li><Link href="/category/53" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Short Active</Link></li>
                       </ul>
                     </div>
 
@@ -298,6 +305,9 @@ export default function NavBar() {
                       </h4>
                       <ul className="space-y-3">
                         <li><Link href="/category/23" className={`text-sm transition-colors duration-200 ${linkClass}`}>Quần Lót Lụa Băng</Link></li>
+                        <li><Link href="/category/70" className={`text-sm transition-colors duration-200 ${linkClass}`}>Sợi Tự Nhiên</Link></li>
+                        <li><Link href="/category/71" className={`text-sm transition-colors duration-200 ${linkClass}`}>Seamless</Link></li>
+                        <li><Link href="/category/72" className={`text-sm transition-colors duration-200 ${linkClass}`}>Thể Thao</Link></li>
                       </ul>
                     </div>
                   </div>
@@ -316,11 +326,11 @@ export default function NavBar() {
                         Nón
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/14" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Dad Hat</Link></li>
-                        <li><Link href="/category/35" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Baseball Cap</Link></li>
-                        <li><Link href="/category/34" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Snap Back</Link></li>
-                        <li><Link href="/category/36" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Bucket</Link></li>
-                        <li><Link href="/category/33" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Fitted Cap</Link></li>
+                        <li><Link href="/category/4" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Dad Hat</Link></li>
+                        <li><Link href="/category/36" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Baseball Cap</Link></li>
+                        <li><Link href="/category/35" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Snap Back</Link></li>
+                        <li><Link href="/category/37" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Bucket</Link></li>
+                        <li><Link href="/category/34" className={`text-sm transition-colors duration-200 ${linkClass}`}>Nón Fitted Cap</Link></li>
                       </ul>
                     </div>
 
@@ -330,9 +340,10 @@ export default function NavBar() {
                         Túi Đeo Chéo & Túi Xách
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/9" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Đeo Chéo</Link></li>
-                        <li><Link href="/category/40" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Bao Tử</Link></li>
-                        <li><Link href="/category/7" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Tote</Link></li>
+                        <li><Link href="/category/12" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Đeo Chéo</Link></li>
+                        <li><Link href="/category/41" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Bao Tử</Link></li>
+                        <li><Link href="/category/10" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Tote</Link></li>
+                        <li><Link href="/category/48" className={`text-sm transition-colors duration-200 ${linkClass}`}>Túi Messenger</Link></li>
                       </ul>
                     </div>
 
@@ -342,7 +353,10 @@ export default function NavBar() {
                         Balo
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/42" className={`text-sm transition-colors duration-200 ${linkClass}`}>Balo Essential</Link></li>
+                        <li><Link href="/category/43" className={`text-sm transition-colors duration-200 ${linkClass}`}>Balo Essential</Link></li>
+                        <li><Link href="/category/80" className={`text-sm transition-colors duration-200 ${linkClass}`}>Balo Camping</Link></li>
+                        <li><Link href="/category/81" className={`text-sm transition-colors duration-200 ${linkClass}`}>Balo Campus</Link></li>
+                        <li><Link href="/category/82" className={`text-sm transition-colors duration-200 ${linkClass}`}>Balo Smart</Link></li>
                       </ul>
                     </div>
 
@@ -352,9 +366,10 @@ export default function NavBar() {
                         Ví
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/30" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Ngang Công Sở</Link></li>
-                        <li><Link href="/category/39" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Canvas</Link></li>
-                        <li><Link href="/category/4" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Cardholder</Link></li>
+                        <li><Link href="/category/7" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Cardholder</Link></li>
+                        <li><Link href="/category/31" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Ngang Công Sở</Link></li>
+                        <li><Link href="/category/40" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Canvas</Link></li>
+                        <li><Link href="/category/61" className={`text-sm transition-colors duration-200 ${linkClass}`}>Ví Cầm Tay</Link></li>
                       </ul>
                     </div>
 
@@ -365,9 +380,10 @@ export default function NavBar() {
                         Dây Nịt
                       </h4>
                       <ul className="space-y-3">
+                        <li><Link href="/category/8" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Dù</Link></li>
+                        <li><Link href="/category/9" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Đan</Link></li>
                         <li><Link href="/category/22" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Da Bò Ý</Link></li>
-                        <li><Link href="/category/6" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Đan</Link></li>
-                        <li><Link href="/category/5" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Dù</Link></li>
+                        <li><Link href="/category/45" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dây Nịt Da Bò</Link></li>
                       </ul>
                     </div>
 
@@ -377,9 +393,10 @@ export default function NavBar() {
                         Vớ
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/28" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Basic</Link></li>
-                        <li><Link href="/category/26" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Công Thái Học</Link></li>
-                        <li><Link href="/category/27" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Thời Trang</Link></li>
+                        <li><Link href="/category/29" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Basic</Link></li>
+                        <li><Link href="/category/27" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Công Thái Học</Link></li>
+                        <li><Link href="/category/28" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Thời Trang</Link></li>
+                        <li><Link href="/category/52" className={`text-sm transition-colors duration-200 ${linkClass}`}>Vớ Thể Thao</Link></li>
                       </ul>
                     </div>
 
@@ -389,42 +406,23 @@ export default function NavBar() {
                         Phụ Kiện Thể Thao
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="#" className={`text-sm transition-colors duration-200 ${linkClass}`}>Băng Trán</Link></li>
-                        <li><Link href="#" className={`text-sm transition-colors duration-200 ${linkClass}`}>Băng Đeo Cổ Tay</Link></li>
-                        <li><Link href="#" className={`text-sm transition-colors duration-200 ${linkClass}`}>Bó Gối</Link></li>
+                        <li><Link href="/category/64" className={`text-sm transition-colors duration-200 ${linkClass}`}>Băng Trán</Link></li>
+                        <li><Link href="/category/66" className={`text-sm transition-colors duration-200 ${linkClass}`}>Băng Đeo Cổ Tay</Link></li>
+                        <li><Link href="/category/75" className={`text-sm transition-colors duration-200 ${linkClass}`}>Bó Gối</Link></li>
+                        <li><Link href="/category/74" className={`text-sm transition-colors duration-200 ${linkClass}`}>Khăn Thể Thao</Link></li>
                       </ul>
                     </div>
 
-                    {/* 8. DÉP */}
+                    {/* 8. GIÀY DÉP */}
                     <div>
                       <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
-                        Dép
+                        Giày & Dép
                       </h4>
                       <ul className="space-y-3">
-                        <li><Link href="/category/31" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Đế Trấu</Link></li>
-                        <li><Link href="/category/38" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Đế Thấp</Link></li>
-                        <li><Link href="/category/43" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Siêu Nhẹ</Link></li>
-                      </ul>
-                    </div>
-
-                    {/* ====== HÀNG 3 ====== */}
-                    {/* 9. GIÀY */}
-                    <div>
-                      <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
-                        Giày
-                      </h4>
-                      <ul className="space-y-3">
-                        <li><Link href="/category/37" className={`text-sm transition-colors duration-200 ${linkClass}`}>Giày Tây Loafer</Link></li>
-                      </ul>
-                    </div>
-
-                    {/* 10. PHỤ KIỆN CÁ NHÂN */}
-                    <div>
-                      <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
-                        Cá Nhân Khác
-                      </h4>
-                      <ul className="space-y-3">
-                        <li><Link href="/category/24" className={`text-sm transition-colors duration-200 ${linkClass}`}>Khác</Link></li>
+                        <li><Link href="/category/32" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Đế Trấu</Link></li>
+                        <li><Link href="/category/39" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Đế Thấp</Link></li>
+                        <li><Link href="/category/44" className={`text-sm transition-colors duration-200 ${linkClass}`}>Dép Siêu Nhẹ</Link></li>
+                        <li><Link href="/category/38" className={`text-sm transition-colors duration-200 ${linkClass}`}>Giày Tây Loafer</Link></li>
                       </ul>
                     </div>
 

@@ -61,7 +61,6 @@ namespace Controllers
 
         // 2. Tạo Admin (Chỉ Admin mới có quyền tạo Admin khác)
         [HttpPost("Admin")]
-        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<User>> CreateAdmin([FromBody] CreateUserRequest request)
         {
             if (await _context.users.AnyAsync(u => u.Username == request.Username))

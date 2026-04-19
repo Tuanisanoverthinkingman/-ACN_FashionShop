@@ -1,7 +1,7 @@
 "use client";
 
 import { orderByProduct } from "@/services/order-services";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getById, getByCategoryId, Product, ProductVariant } from "@/services/product-services";
 import { addToCart } from "@/services/cart-services";
@@ -20,10 +20,22 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
   const [adding, setAdding] = useState(false);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   
-  // STATE MỚI: Lưu trữ Biến thể (Size) đang được chọn
+  // --- QUẢN LÝ BIẾN THỂ ---
+  const [selectedColor, setSelectedColor] = useState<string>(""); 
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
-  // Lấy thông tin sản phẩm, sản phẩm liên quan và promotion
+  // 1. Lấy danh sách màu sắc duy nhất từ các biến thể (dùng Set để lọc trùng)
+  const uniqueColors = useMemo(() => {
+    if (!product?.productVariants) return [];
+    return Array.from(new Set(product.productVariants.map(v => v.color))).filter(c => c);
+  }, [product]);
+
+  // 2. Lấy danh sách Size khả dụng dựa trên màu đã chọn
+  const availableSizes = useMemo(() => {
+    if (!product?.productVariants || !selectedColor) return [];
+    return product.productVariants.filter(v => v.color === selectedColor);
+  }, [product, selectedColor]);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -31,10 +43,11 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
         const data = await getById(Number(id));
         setProduct(data || null);
         
-        // Tự động chọn Size đầu tiên (ưu tiên size còn hàng) khi vừa load xong
         if (data && data.productVariants && data.productVariants.length > 0) {
-          const availableVariant = data.productVariants.find(v => v.instock > 0) || data.productVariants[0];
-          setSelectedVariant(availableVariant);
+          // Mặc định chọn biến thể đầu tiên còn hàng
+          const initialVariant = data.productVariants.find(v => v.instock > 0) || data.productVariants[0];
+          setSelectedColor(initialVariant.color || "Mặc định");
+          setSelectedVariant(initialVariant);
         }
 
         if (data?.categoryId) {
@@ -53,7 +66,18 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
     fetchData();
   }, [id]);
 
-  // --- Helper: Tính % giảm giá ---
+  // Hàm xử lý khi người dùng đổi màu
+  const handleColorChange = (color: string) => {
+    setSelectedColor(color);
+    // Khi đổi màu, tự động chọn size đầu tiên của màu đó còn hàng
+    const firstAvailableSize = product?.productVariants.find(v => v.color === color && v.instock > 0) 
+                             || product?.productVariants.find(v => v.color === color);
+    if (firstAvailableSize) {
+      setSelectedVariant(firstAvailableSize);
+    }
+  };
+
+  // --- Logic Giá & Khuyến mãi ---
   const getDiscountPercent = (p: Product) => {
     const applicablePromos = promotions.filter(promo => {
       switch (promo.applyType) {
@@ -63,11 +87,9 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
         default: return false;
       }
     });
-    if (applicablePromos.length === 0) return 0;
-    return applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
+    return applicablePromos.length === 0 ? 0 : applicablePromos.reduce((max, promo) => Math.max(max, promo.discountPercent), 0);
   };
 
-  // Helper cho sản phẩm liên quan (Hiển thị giá Min)
   const getMinPrice = (p: Product) => {
     if (!p.productVariants || p.productVariants.length === 0) return 0;
     return Math.min(...p.productVariants.map(v => v.price));
@@ -75,17 +97,15 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
 
   const handleAddToCart = async () => {
     if (!product || !selectedVariant) {
-      toast.warning("Vui lòng chọn kích cỡ!");
+      toast.warning("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
       return;
     }
     setAdding(true);
     try {
-      // GỬI LÊN ID CỦA BIẾN THỂ (SIZE ĐƯỢC CHỌN)
       await addToCart({ productVariantId: selectedVariant.id, quantity: 1 });
       toast.success("Đã thêm vào giỏ hàng 🎉");
       window.dispatchEvent(new Event("cartChanged"));
     } catch (err) {
-      console.error(err);
       toast.error("Thêm vào giỏ hàng thất bại 😢");
     } finally {
       setAdding(false);
@@ -94,26 +114,21 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
 
   const handleBuyNow = async () => {
     if (!product || !selectedVariant) {
-      toast.warning("Vui lòng chọn kích cỡ!");
+      toast.warning("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
       return;
     }
-
     const token = localStorage.getItem("token");
     if (!token) {
       toast.warning("Cần đăng nhập để mua hàng");
       router.push("/login");
       return;
     }
-
     try {
-      // GỬI LÊN ID CỦA BIẾN THỂ (SIZE ĐƯỢC CHỌN)
       const res = await orderByProduct(selectedVariant.id, 1);
       toast.success("Mua ngay thành công 🎉");
       router.push(`/checkout/${res.orderId}`);
     } catch (err: any) {
-      console.error(err);
       if (err.response?.status === 401) {
-        toast.warning("Phiên đăng nhập hết hạn, đăng nhập lại");
         router.push("/login");
         return;
       }
@@ -124,19 +139,20 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
   if (loading) return <p className="text-center mt-10 text-lg">Đang tải sản phẩm...</p>;
   if (!product) return <p className="text-center mt-10 text-red-500 text-lg">Sản phẩm không tồn tại 😢</p>;
 
-  // Lấy giá trị từ Biến thể đang được chọn thay vì Sản phẩm gốc
   const currentPrice = selectedVariant?.price || 0;
   const currentStock = selectedVariant?.instock || 0;
-
   const maxDiscountPercent = getDiscountPercent(product);
   const discountedPrice = currentPrice * (1 - maxDiscountPercent / 100);
   const hasDiscount = maxDiscountPercent > 0;
 
+  // QUAN TRỌNG: Ưu tiên lấy ảnh của biến thể màu đang chọn để tạo hiệu ứng đổi ảnh
+  const displayImage = selectedVariant?.imageUrl || product.imageUrl || "/images/default.jpg";
+
   return (
     <div className="bg-gray-100 pt-20 font-['Poppins'] min-h-screen">
       <div className="max-w-6xl mx-auto py-10 px-4">
-        {/* Main product */}
         <div className="bg-white rounded-xl shadow-md p-6 flex flex-col md:flex-row gap-8">
+          
           {/* Hình ảnh */}
           <div className="flex-1 flex justify-center items-start relative">
             {hasDiscount && (
@@ -145,9 +161,9 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
               </div>
             )}
             <img
-              src={product.imageUrl || "/images/default.jpg"}
+              src={displayImage}
               alt={product.name}
-              className="w-full max-w-md rounded-2xl border border-gray-200 object-cover shadow-sm sticky top-24"
+              className="w-full max-w-md rounded-2xl border border-gray-200 object-cover shadow-sm sticky top-24 transition-all duration-300"
             />
           </div>
 
@@ -168,16 +184,37 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
               </p>
             </div>
 
-            {/* KHU VỰC CHỌN SIZE MỚI */}
+            {/* CHỌN MÀU SẮC */}
+            {uniqueColors.length > 0 && uniqueColors[0] !== "Mặc định" && (
+              <div className="flex flex-col gap-3">
+                <span className="font-semibold text-gray-800">Màu sắc: <span className="font-normal text-gray-600 ml-1">{selectedColor}</span></span>
+                <div className="flex flex-wrap gap-3">
+                  {uniqueColors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => handleColorChange(color)}
+                      className={`px-4 py-2 border rounded-md font-medium transition-all duration-200 
+                        ${selectedColor === color 
+                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 shadow-sm" 
+                          : "border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                        }`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CHỌN KÍCH THƯỚC (Lọc theo màu đã chọn) */}
             <div className="flex flex-col gap-3 py-2">
               <span className="font-semibold text-gray-800">
                 Kích thước: <span className="font-normal text-gray-600 ml-1">{selectedVariant?.size}</span>
               </span>
               <div className="flex flex-wrap gap-3">
-                {product.productVariants?.map((variant) => {
+                {availableSizes.map((variant) => {
                   const isSelected = selectedVariant?.id === variant.id;
                   const isOutOfStock = variant.instock <= 0;
-
                   return (
                     <button
                       key={variant.id}
@@ -236,7 +273,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
           </div>
         </div>
 
-        {/* Sản phẩm liên quan */}
+        {/* Sản phẩm liên quan & Feedback giữ nguyên */}
         {related.length > 0 && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
@@ -290,7 +327,6 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
           </div>
         )}
 
-        {/* Feedback */}
         <div className="mt-16 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <Feedback productId={product.id} currentUserId={currentUserId} isAdmin={isAdmin} />
         </div>

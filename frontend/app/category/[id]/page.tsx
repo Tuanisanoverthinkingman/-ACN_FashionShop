@@ -34,7 +34,7 @@ export default function CategoryPage() {
         setPromotions(promoData || []);
       } catch (err) {
         console.error(err);
-        toast.error("Không tải được sản phẩm 😢");
+        toast.error("Không tải được sản phẩm");
       } finally {
         setLoading(false);
       }
@@ -103,7 +103,7 @@ export default function CategoryPage() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 px-4 py-2">
           <input
             type="text"
-            placeholder="🔍 Tìm kiếm sản phẩm..."
+            placeholder="Tìm kiếm sản phẩm..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full md:w-1/2 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -121,7 +121,7 @@ export default function CategoryPage() {
 
         {/* Product Grid */}
         {currentProducts.length === 0 ? (
-          <p className="text-center text-gray-500 italic py-20">Không có sản phẩm nào phù hợp 🥺</p>
+          <p className="text-center text-gray-500 italic py-20">Không có sản phẩm nào phù hợp</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {currentProducts.map(product => {

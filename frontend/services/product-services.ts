@@ -6,6 +6,7 @@ export interface ProductVariant {
   productId: number;
   size: string;
   color: string;
+  imageUrl?: string;
   costPrice: number;
   price: number;
   instock: number;
