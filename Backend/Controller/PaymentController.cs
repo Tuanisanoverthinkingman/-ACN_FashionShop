@@ -32,11 +32,10 @@ namespace Controllers
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var now = DateTime.UtcNow;
 
-            // ===== LOAD ORDER VỚI KIẾN TRÚC MỚI =====
             var order = await _context.orders
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.ProductVariant) // Kéo biến thể
-                        .ThenInclude(pv => pv.Product)    // Kéo sản phẩm gốc
+                    .ThenInclude(od => od.ProductVariant)
+                        .ThenInclude(pv => pv.Product)
                 .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == dto.OrderId && o.UserId == userId);
 
@@ -49,12 +48,11 @@ namespace Controllers
             Promotion? selectedPromo = null;
             UserPromotion? userPromo = null;
 
+            // KIỂM TRA MÃ VOUCHER NGƯỜI DÙNG ÁP DỤNG THỦ CÔNG
             if (dto.PromoId.HasValue)
             {
                 selectedPromo = await _context.promotions
                     .Include(p => p.UserPromotions)
-                    .Include(p => p.PromotionProducts)
-                    .Include(p => p.PromotionCategories)
                     .FirstOrDefaultAsync(p =>
                         p.PromotionId == dto.PromoId &&
                         p.Status == PromotionStatus.Active &&
@@ -65,67 +63,25 @@ namespace Controllers
                 if (selectedPromo == null)
                     return BadRequest(new { message = "Mã khuyến mãi không hợp lệ hoặc đã hết hạn." });
 
-                if (selectedPromo.ApplyType == PromotionApplyType.General ||
-                    selectedPromo.ApplyType == PromotionApplyType.User)
-                {
-                    userPromo = selectedPromo.UserPromotions.FirstOrDefault(up =>
-                        up.UserId == userId && !up.IsUsed
-                    );
+                userPromo = selectedPromo.UserPromotions.FirstOrDefault(up => up.UserId == userId && !up.IsUsed);
 
-                    if (userPromo == null)
-                        return BadRequest(new { message = "Bạn chưa nhận mã này hoặc mã đã được sử dụng." });
-                }
+                if (userPromo == null)
+                    return BadRequest(new { message = "Bạn chưa nhận mã này hoặc mã đã được sử dụng." });
             }
 
-            var activePromos = await _context.promotions
-                .Include(p => p.PromotionProducts)
-                .Include(p => p.PromotionCategories)
-                .Include(p => p.UserPromotions)
-                .Where(p => p.Status == PromotionStatus.Active &&
-                            p.StartDate <= now &&
-                            p.EndDate >= now)
-                .ToListAsync();
-
             decimal totalAmount = 0;
-            decimal finalAmount = 0;
             var productBreakdown = new List<object>();
 
+            // TÍNH TỔNG TIỀN (Dựa trên UnitPrice ĐÃ SALE từ OrderController)
             foreach (var od in order.OrderDetails)
             {
-                // KIỂM TRA TỒN KHO TỪ BẢNG PRODUCT VARIANT
                 if (od.Quantity > od.ProductVariant.Instock)
                 {
-                    return BadRequest(new
-                    {
-                        message = $"Phân loại hàng {od.ProductVariant.Product.Name} (Size: {od.ProductVariant.Size}, Màu: {od.ProductVariant.Color}) chỉ còn {od.ProductVariant.Instock} trong kho."
-                    });
+                    return BadRequest(new { message = $"Phân loại hàng {od.ProductVariant.Product.Name} (Size: {od.ProductVariant.Size}, Màu: {od.ProductVariant.Color}) chỉ còn {od.ProductVariant.Instock} trong kho." });
                 }
 
-                decimal original = od.UnitPrice * od.Quantity;
-                decimal bestDiscount = 0;
-
-                foreach (var promo in activePromos)
-                {
-                    bool applicable = promo.ApplyType switch
-                    {
-                        // KIỂM TRA MÃ GIẢM GIÁ THÔNG QUA ID SẢN PHẨM GỐC
-                        PromotionApplyType.Product => promo.PromotionProducts.Any(pp => pp.ProductId == od.ProductVariant.ProductId),
-                        PromotionApplyType.Category => promo.PromotionCategories.Any(pc => pc.CategoryId == od.ProductVariant.Product.CategoryId),
-                        _ => false
-                    };
-
-                    if (applicable)
-                        bestDiscount = Math.Max(bestDiscount, (decimal)promo.DiscountPercent);
-                }
-
-                if (selectedPromo != null && (selectedPromo.ApplyType == PromotionApplyType.General || selectedPromo.ApplyType == PromotionApplyType.User))
-                {
-                    bestDiscount = Math.Max(bestDiscount, (decimal)selectedPromo.DiscountPercent);
-                }
-
-                decimal discounted = original * (1 - bestDiscount / 100);
-                totalAmount += original;
-                finalAmount += discounted;
+                decimal itemTotal = od.UnitPrice * od.Quantity;
+                totalAmount += itemTotal;
 
                 productBreakdown.Add(new
                 {
@@ -135,11 +91,13 @@ namespace Controllers
                     Color = od.ProductVariant.Color,
                     od.Quantity,
                     od.UnitPrice,
-                    OriginalAmount = original,
-                    DiscountedAmount = discounted,
-                    DiscountApplied = bestDiscount
+                    ItemTotal = itemTotal
                 });
             }
+
+            // ÁP DỤNG MÃ VOUCHER (Nếu có) VÀO TỔNG TIỀN
+            decimal voucherDiscountPercent = selectedPromo != null ? (decimal)selectedPromo.DiscountPercent : 0;
+            decimal finalAmount = totalAmount * (1 - voucherDiscountPercent / 100);
 
             var payment = new Payment
             {
@@ -153,6 +111,24 @@ namespace Controllers
             };
 
             _context.payments.Add(payment);
+
+            // LOGIC TRỪ KHO NẾU LÀ THANH TOÁN COD (VNPay sẽ trừ lúc Callback thành công)
+            if (dto.PaymentMethod.ToUpper() == "COD")
+            {
+                foreach (var od in order.OrderDetails)
+                {
+                    od.ProductVariant.Instock -= od.Quantity; // Trừ kho
+                }
+                
+                if (userPromo != null)
+                {
+                    userPromo.IsUsed = true; // Đánh dấu đã dùng Voucher
+                    userPromo.UsedAt = DateTime.UtcNow;
+                }
+                
+                order.OrderStatus = "Processing"; // Chuyển trạng thái đơn hàng luôn
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -176,14 +152,9 @@ namespace Controllers
                 .Include(p => p.Order)
                 .FirstOrDefaultAsync(p => p.PaymentId == paymentId);
 
-            if (payment == null)
-                return NotFound(new { message = "Payment không tồn tại." });
-
-            if (payment.Order.UserId != userId)
-                return Unauthorized();
-
-            if (payment.Status == PaymentStatus.Paid)
-                return BadRequest(new { message = "Payment đã thanh toán." });
+            if (payment == null) return NotFound(new { message = "Payment không tồn tại." });
+            if (payment.Order.UserId != userId) return Unauthorized();
+            if (payment.Status == PaymentStatus.Paid) return BadRequest(new { message = "Payment đã thanh toán." });
 
             payment.Status = PaymentStatus.Pending;
             payment.CreateAt = DateTime.UtcNow;
@@ -192,7 +163,7 @@ namespace Controllers
             return Ok(new { message = "Retry payment thành công!", payment });
         }
 
-        // 3. CANCEL PAYMENT
+        // 3. CANCEL PAYMENT (KÈM HOÀN KHO)
         [HttpPost("cancel/{paymentId}")]
         [Authorize]
         public async Task<IActionResult> CancelPayment(int paymentId)
@@ -201,16 +172,30 @@ namespace Controllers
 
             var payment = await _context.payments
                 .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderDetails)
+                        .ThenInclude(od => od.ProductVariant)
+                .Include(p => p.Promotion)
+                    .ThenInclude(pr => pr.UserPromotions)
                 .FirstOrDefaultAsync(p => p.PaymentId == paymentId);
 
-            if (payment == null)
-                return NotFound();
+            if (payment == null) return NotFound();
+            if (payment.Order.UserId != userId) return Unauthorized();
+            if (payment.Status == PaymentStatus.Paid) return BadRequest(new { message = "Không thể hủy payment đã thanh toán." });
 
-            if (payment.Order.UserId != userId)
-                return Unauthorized();
+            // NẾU LÀ ĐƠN COD (Đã trừ kho lúc tạo) THÌ PHẢI HOÀN LẠI KHO VÀ VOUCHER
+            if (payment.PaymentMethod.ToUpper() == "COD" && payment.Status != PaymentStatus.Cancelled)
+            {
+                foreach (var od in payment.Order.OrderDetails)
+                {
+                    if (od.ProductVariant != null) od.ProductVariant.Instock += od.Quantity;
+                }
 
-            if (payment.Status == PaymentStatus.Paid)
-                return BadRequest(new { message = "Không thể hủy payment đã thanh toán." });
+                if (payment.PromoId.HasValue && payment.Promotion != null)
+                {
+                    var userPromo = payment.Promotion.UserPromotions.FirstOrDefault(up => up.UserId == userId && up.IsUsed);
+                    if (userPromo != null) userPromo.IsUsed = false;
+                }
+            }
 
             payment.Status = PaymentStatus.Cancelled;
             payment.Order.OrderStatus = "Cancelled";
@@ -224,26 +209,40 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
         {
-            var payment = await _context.payments.FindAsync(id);
+            var payment = await _context.payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderDetails)
+                        .ThenInclude(od => od.ProductVariant)
+                .FirstOrDefaultAsync(p => p.PaymentId == id);
+                
             if (payment == null) return NotFound();
 
             if (!Enum.TryParse<PaymentStatus>(newStatus, out var status))
                 return BadRequest(new { message = "Trạng thái không hợp lệ." });
 
-            payment.Status = status;
-
-            var order = await _context.orders.FindAsync(payment.OrderId);
-            if (order != null)
+            // Logic hoàn kho nếu Admin hủy đơn COD hoặc đơn đã Paid
+            if ((status == PaymentStatus.Cancelled || status == PaymentStatus.Failed) 
+                && payment.Status != PaymentStatus.Cancelled 
+                && payment.Status != PaymentStatus.Failed)
             {
-                order.OrderStatus = status switch
+                if (payment.PaymentMethod.ToUpper() == "COD" || payment.Status == PaymentStatus.Paid)
                 {
-                    PaymentStatus.Paid => "Paid",
-                    PaymentStatus.Pending => "Pending",
-                    PaymentStatus.Failed => "PaymentFailed",
-                    PaymentStatus.Cancelled => "Cancelled",
-                    _ => order.OrderStatus
-                };
+                    foreach (var od in payment.Order.OrderDetails)
+                    {
+                        if (od.ProductVariant != null) od.ProductVariant.Instock += od.Quantity;
+                    }
+                }
             }
+
+            payment.Status = status;
+            payment.Order.OrderStatus = status switch
+            {
+                PaymentStatus.Paid => "Paid",
+                PaymentStatus.Pending => "Pending",
+                PaymentStatus.Failed => "PaymentFailed",
+                PaymentStatus.Cancelled => "Cancelled",
+                _ => payment.Order.OrderStatus
+            };
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Cập nhật trạng thái thành công!", payment });
@@ -257,7 +256,7 @@ namespace Controllers
             var payments = await _context.payments
                 .Include(p => p.Order)
                     .ThenInclude(o => o.OrderDetails)
-                        .ThenInclude(od => od.ProductVariant) // CẬP NHẬT CHUỖI INCLUDE
+                        .ThenInclude(od => od.ProductVariant)
                             .ThenInclude(pv => pv.Product)
                 .Include(p => p.Promotion)
                 .OrderByDescending(p => p.CreateAt)
@@ -276,7 +275,7 @@ namespace Controllers
             var payments = await _context.payments
                 .Include(p => p.Order)
                     .ThenInclude(o => o.OrderDetails)
-                        .ThenInclude(od => od.ProductVariant) // CẬP NHẬT CHUỖI INCLUDE
+                        .ThenInclude(od => od.ProductVariant)
                             .ThenInclude(pv => pv.Product)
                 .Include(p => p.Promotion)
                 .Where(p => p.Order.UserId == userId)
@@ -294,7 +293,7 @@ namespace Controllers
             var payment = await _context.payments
                 .Include(p => p.Order)
                     .ThenInclude(o => o.OrderDetails)
-                        .ThenInclude(od => od.ProductVariant) // CẬP NHẬT CHUỖI INCLUDE
+                        .ThenInclude(od => od.ProductVariant)
                             .ThenInclude(pv => pv.Product)
                 .Include(p => p.Promotion)
                 .FirstOrDefaultAsync(p => p.PaymentId == id);
@@ -311,7 +310,7 @@ namespace Controllers
             var payment = await _context.payments
                 .Include(p => p.Order)
                     .ThenInclude(o => o.OrderDetails)
-                        .ThenInclude(od => od.ProductVariant) // CẬP NHẬT CHUỖI INCLUDE
+                        .ThenInclude(od => od.ProductVariant)
                             .ThenInclude(pv => pv.Product)
                 .Include(p => p.Promotion)
                 .Where(p => p.OrderId == orderId)
@@ -387,8 +386,7 @@ namespace Controllers
             vnp_Params.Remove("vnp_SecureHash");
             vnp_Params.Remove("vnp_SecureHashType");
 
-            var rawData = string.Join("&", vnp_Params
-                .Select(kvp => $"{kvp.Key}={System.Net.WebUtility.UrlEncode(kvp.Value)}"));
+            var rawData = string.Join("&", vnp_Params.Select(kvp => $"{kvp.Key}={System.Net.WebUtility.UrlEncode(kvp.Value)}"));
 
             using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(vnp_HashSecret));
             var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawData));
@@ -396,23 +394,16 @@ namespace Controllers
 
             if (computedHash != receivedHash.ToUpper())
             {
-                var rawDataFallback = string.Join("&", vnp_Params
-                    .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
-
+                var rawDataFallback = string.Join("&", vnp_Params.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
                 var hashBytesFallback = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawDataFallback));
                 var computedHashFallback = BitConverter.ToString(hashBytesFallback).Replace("-", "").ToUpper();
 
                 if (computedHashFallback == receivedHash.ToUpper())
                 {
                     computedHash = computedHashFallback;
-                    rawData = rawDataFallback; 
                 }
                 else
                 {
-                    Console.WriteLine("--- VNPay Debug Lần 2 ---");
-                    Console.WriteLine($"Raw Data (UrlEncode): {rawData}");
-                    Console.WriteLine($"Computed: {computedHash}");
-                    Console.WriteLine($"Received: {receivedHash.ToUpper()}");
                     return BadRequest("Chữ ký không hợp lệ");
                 }
             }
@@ -424,9 +415,8 @@ namespace Controllers
                 .Include(p => p.Order)
                     .ThenInclude(o => o.OrderDetails)
                         .ThenInclude(od => od.ProductVariant)
-                            .ThenInclude(pv => pv.Product)
                 .Include(p => p.Promotion)
-                    .ThenInclude(p => p.UserPromotions)
+                    .ThenInclude(pr => pr.UserPromotions)
                 .FirstOrDefaultAsync(p => p.PaymentId == paymentId);
 
             if (payment == null) return NotFound("Giao dịch không tồn tại");
@@ -438,18 +428,17 @@ namespace Controllers
                 payment.Status = PaymentStatus.Paid;
                 payment.Order.OrderStatus = "Paid";
 
+                // TRỪ KHO KHI VNPAY THÀNH CÔNG
                 foreach (var od in payment.Order.OrderDetails)
                 {
                     if (od.ProductVariant != null)
                         od.ProductVariant.Instock -= od.Quantity;
                 }
 
-                if (payment.PromoId.HasValue && payment.Promotion != null &&
-                    payment.Promotion.ApplyType != PromotionApplyType.Product &&
-                    payment.Promotion.ApplyType != PromotionApplyType.Category)
+                // ĐÁNH DẤU SỬ DỤNG VOUCHER KHI VNPAY THÀNH CÔNG
+                if (payment.PromoId.HasValue && payment.Promotion != null)
                 {
-                    var userPromo = payment.Promotion.UserPromotions
-                        .FirstOrDefault(up => !up.IsUsed && up.UserId == payment.Order.UserId);
+                    var userPromo = payment.Promotion.UserPromotions.FirstOrDefault(up => !up.IsUsed && up.UserId == payment.Order.UserId);
                     if (userPromo != null)
                     {
                         userPromo.IsUsed = true;

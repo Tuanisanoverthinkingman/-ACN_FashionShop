@@ -6,6 +6,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ToastContainer, toast } from "react-toastify";
 import { label } from "framer-motion/client";
+import {
+  DashboardOutlined,
+  TeamOutlined,
+  AppstoreOutlined,
+  ShoppingOutlined,
+  TagOutlined,
+  MessageOutlined,
+  FileTextOutlined,
+  BarChartOutlined
+} from "@ant-design/icons";
 
 
 const { Header, Content, Sider } = Layout;
@@ -13,7 +23,6 @@ const { Header, Content, Sider } = Layout;
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  // Kiểm tra đăng nhập + role admin
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (!userStr) {
@@ -38,13 +47,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const menuItems = [
-    { key: "1", label: <Link href="/admin">DashBoard</Link> },
-    { key: "2", label: <Link href="/admin/users">Quản lý người dùng</Link> },
-    { key: "3", label: <Link href="/admin/categories">Quản lý danh mục</Link> },
-    { key: "4", label: <Link href="/admin/products">Quản lý sản phẩm</Link> },
-    { key: "5", label: <Link href="/admin/promotions">Quản lý mã giảm giá</Link> },
-    { key: "6", label: <Link href="/admin/feedbacks">Quản lý phản hồi</Link> },
-    { key: "7", label: <Link href="/admin/orders">Quản lý đơn hàng</Link> },
+    { key: "1", icon: <DashboardOutlined />, label: <Link href="/admin">DashBoard</Link> },
+    { key: "2", icon: <TeamOutlined />, label: <Link href="/admin/users">Quản lý người dùng</Link> },
+    { key: "3", icon: <AppstoreOutlined />, label: <Link href="/admin/categories">Quản lý danh mục</Link> },
+    { key: "4", icon: <ShoppingOutlined />, label: <Link href="/admin/products">Quản lý sản phẩm</Link> },
+    { key: "5", icon: <TagOutlined />, label: <Link href="/admin/promotions">Quản lý mã giảm giá</Link> },
+    { key: "6", icon: <MessageOutlined />, label: <Link href="/admin/feedbacks">Quản lý phản hồi</Link> },
+    { key: "7", icon: <FileTextOutlined />, label: <Link href="/admin/orders">Quản lý đơn hàng</Link> },
+    { key: "8", icon: <BarChartOutlined />, label: <Link href="/admin/reports">Báo cáo thống kê</Link> },
   ];
 
   return (

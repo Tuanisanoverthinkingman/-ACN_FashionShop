@@ -27,14 +27,14 @@ namespace Models
         public Order Order { get; set; }
 
         [Required]
-        public string PaymentMethod { get; set; } // "COD" hoặc "BankTransfer"
+        public string PaymentMethod { get; set; } 
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
-        public decimal Amount { get; set; } // Số tiền thanh toán (có thể giống TotalAmount bên Order)
+        public decimal Amount { get; set; } 
 
         [Required]
-        public PaymentStatus Status { get; set; } // "Pending", "Paid", "Failed", "Refunded", v.v.
+        public PaymentStatus Status { get; set; } 
 
         [Required]
         public string Address { get; set; }

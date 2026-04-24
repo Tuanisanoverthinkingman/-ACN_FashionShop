@@ -26,6 +26,7 @@ import {
 import { getAllCategories, Category } from "@/services/category-services";
 import { uploadImage } from "@/services/file-services";
 import type { UploadFile } from "antd/es/upload/interface";
+import { toast } from "react-toastify";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,7 +34,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [excelFile, setExcelFile] = useState<File | null>(null);
+
+  // States cho Ảnh và Excel
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageFileList, setImageFileList] = useState<UploadFile[]>([]);
   const [removeImage, setRemoveImage] = useState(false);
@@ -88,7 +90,6 @@ export default function ProductsPage() {
       name: product.name,
       description: product.description,
       categoryId: product.categoryId,
-      // Gán giá trị biến thể, nếu color trống thì mặc định là "Mặc định"
       productVariants: product.productVariants?.map(v => ({
         ...v,
         color: v.color || "Mặc định"
@@ -112,7 +113,7 @@ export default function ProductsPage() {
     form.setFieldsValue({
       productVariants: [{ size: "", color: "Mặc định", costPrice: 0, price: 0, instock: 0 }]
     });
-    setImageFileList([{ uid: "-1", name: "no_image.png", status: "done", url: "/no_image.png" }]);
+    setImageFileList([]);
     setImageFile(null);
     setModalOpen(true);
   };
@@ -121,6 +122,7 @@ export default function ProductsPage() {
     try {
       const values = await form.validateFields();
       let imageUrl: string | null = editingProduct?.imageUrl ?? null;
+
       if (removeImage) imageUrl = null;
       if (imageFile) imageUrl = await uploadImage(imageFile);
 
@@ -131,17 +133,46 @@ export default function ProductsPage() {
 
       if (editingProduct) {
         await updateProduct(editingProduct.id, data);
+        toast.success("Cập nhật thành công!");
       } else {
         await createProduct(data);
+        toast.success("Thêm mới thành công!");
       }
 
       setModalOpen(false);
       fetchProducts();
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // --- CẬP NHẬT LOGIC IMPORT EXCEL --
+  const handleExcelUpload = async (file: File) => {
+    try {
+      setLoading(true);
+      await uploadExcelSheets(file);
+      toast.success("Import Excel thành công!");
+      fetchProducts();
+    } catch (error) {
+      toast.error("Lỗi khi import Excel");
+      console.error(error);
+    } finally {
+      setExcelFileList([]);
+      setLoading(false);
+    }
+    return false;
   };
 
   const columns = [
     { title: "ID", dataIndex: "id", key: "id", width: 70 },
+    {
+      title: "Ảnh",
+      key: "image",
+      width: 80,
+      render: (_: any, record: Product) => (
+        <img src={record.imageUrl || "/no_image.png"} alt="product" style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 4 }} />
+      ),
+    },
     { title: "Tên sản phẩm", dataIndex: "name", key: "name" },
     {
       title: "Giá bán",
@@ -183,13 +214,6 @@ export default function ProductsPage() {
       ),
     },
     {
-      title: "Ảnh",
-      key: "image",
-      render: (_: any, record: Product) => (
-        <img src={record.imageUrl || "/no_image.png"} alt="product" style={{ width: 40, height: 40, objectFit: "cover" }} />
-      ),
-    },
-    {
       title: "Hành động",
       key: "actions",
       width: 150,
@@ -222,8 +246,14 @@ export default function ProductsPage() {
 
       <Space className="mb-4">
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>Thêm sản phẩm</Button>
-        <Upload accept=".xlsx" maxCount={1} fileList={excelFileList} beforeUpload={() => false} onChange={({ fileList }) => setExcelFileList(fileList)}>
-          <Button icon={<UploadOutlined />}>Excel</Button>
+        <Upload
+          accept=".xlsx"
+          maxCount={1}
+          fileList={excelFileList}
+          beforeUpload={handleExcelUpload}
+          showUploadList={false}
+        >
+          <Button icon={<UploadOutlined />}>Import Excel</Button>
         </Upload>
       </Space>
 
@@ -234,24 +264,56 @@ export default function ProductsPage() {
         open={modalOpen}
         onOk={handleModalOk}
         onCancel={() => setModalOpen(false)}
-        width={700}
+        width={800}
+        destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item label="Tên sản phẩm" name="name" rules={[{ required: true }]}>
-            <Input />
+          <div style={{ display: 'flex', gap: 20 }}>
+            {/* Cột trái: Ảnh */}
+            <div style={{ width: 150 }}>
+              <Form.Item label="Hình ảnh">
+                <Upload
+                  listType="picture-card"
+                  fileList={imageFileList}
+                  beforeUpload={(file) => {
+                    setImageFile(file);
+                    setImageFileList([file as any]);
+                    setRemoveImage(false);
+                    return false; // Ngăn auto upload
+                  }}
+                  onRemove={() => {
+                    setImageFile(null);
+                    setImageFileList([]);
+                    setRemoveImage(true);
+                  }}
+                >
+                  {imageFileList.length >= 1 ? null : <div><PlusOutlined /><div style={{ marginTop: 8 }}>Tải ảnh</div></div>}
+                </Upload>
+              </Form.Item>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <Form.Item label="Tên sản phẩm" name="name" rules={[{ required: true }]}>
+                <Input />
+              </Form.Item>
+
+              <Form.Item label="Danh mục" name="categoryId" rules={[{ required: true }]}>
+                <Select options={categories.map((c) => ({ label: c.name, value: c.id }))} />
+              </Form.Item>
+            </div>
+          </div>
+
+          <Form.Item label="Mô tả" name="description">
+            <Input.TextArea rows={3} placeholder="Nhập mô tả sản phẩm..." />
           </Form.Item>
 
-          <Form.Item label="Danh mục" name="categoryId" rules={[{ required: true }]}>
-            <Select options={categories.map((c) => ({ label: c.name, value: c.id }))} />
-          </Form.Item>
+          <Divider orientation={"left" as any} plain>Biến thể sản phẩm</Divider>
 
-          <Divider orientation={"left" as any} plain>Biến thể</Divider>
-
-          {/* Tiêu đề cột Biến thể - Đã ẩn Màu sắc */}
           <div style={{ display: 'flex', marginBottom: 8, fontWeight: 'bold' }}>
-            <div style={{ width: 100, marginRight: 8 }}>Kích cỡ</div>
-            <div style={{ width: 140, marginRight: 8 }}>Giá nhập</div>
-            <div style={{ width: 140, marginRight: 8 }}>Giá bán</div>
+            <div style={{ width: 120, marginRight: 8 }}>Kích cỡ</div>
+            <div style={{ width: 120, marginRight: 8 }}>Màu sắc</div>
+            <div style={{ width: 160, marginRight: 8 }}>Giá nhập</div>
+            <div style={{ width: 160, marginRight: 8 }}>Giá bán</div>
             <div style={{ width: 100, marginRight: 8 }}>Tồn kho</div>
           </div>
 
@@ -260,27 +322,35 @@ export default function ProductsPage() {
               <>
                 {fields.map(({ key, name, ...restField }) => (
                   <Space key={key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
-                    {/* Size */}
+
                     <Form.Item {...restField} name={[name, "size"]} rules={[{ required: true }]}>
                       <Input placeholder="Size" style={{ width: 100 }} />
                     </Form.Item>
 
-                    {/* ẨN MÀU SẮC NHƯNG VẪN LƯU GIÁ TRỊ MẶC ĐỊNH */}
-                    <Form.Item {...restField} name={[name, "color"]} hidden initialValue="Mặc định">
-                      <Input />
+                    <Form.Item {...restField} name={[name, "color"]} rules={[{ required: true }]}>
+                      <Input placeholder="Màu sắc" style={{ width: 120 }} />
                     </Form.Item>
 
-                    {/* Giá nhập */}
                     <Form.Item {...restField} name={[name, "costPrice"]} rules={[{ required: true }]}>
-                      <InputNumber min={0} style={{ width: 140 }} formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                      <InputNumber
+                        min={0 as number}
+                        style={{ width: 160 }}
+                        formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={v => v ? Number(v.replace(/\$\s?|(,*)/g, '')) : 0}
+                        placeholder="VNĐ"
+                      />
                     </Form.Item>
 
-                    {/* Giá bán */}
                     <Form.Item {...restField} name={[name, "price"]} rules={[{ required: true }]}>
-                      <InputNumber min={0} style={{ width: 140 }} formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                      <InputNumber
+                        min={0 as number}
+                        style={{ width: 160 }}
+                        formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={v => v ? Number(v.replace(/\$\s?|(,*)/g, '')) : 0}
+                        placeholder="VNĐ"
+                      />
                     </Form.Item>
 
-                    {/* Kho */}
                     <Form.Item {...restField} name={[name, "instock"]} rules={[{ required: true }]}>
                       <InputNumber min={0} style={{ width: 100 }} />
                     </Form.Item>
@@ -288,7 +358,7 @@ export default function ProductsPage() {
                     {fields.length > 1 && <Button type="text" danger onClick={() => remove(name)} icon={<DeleteOutlined />} />}
                   </Space>
                 ))}
-                <Button type="dashed" onClick={() => add({ color: "Mặc định", costPrice: 0, price: 0, instock: 0 })} block icon={<PlusOutlined />}>Thêm Size</Button>
+                <Button type="dashed" onClick={() => add({ color: "Mặc định", costPrice: 0, price: 0, instock: 0 })} block icon={<PlusOutlined />}>Thêm Kích cỡ mới</Button>
               </>
             )}
           </Form.List>

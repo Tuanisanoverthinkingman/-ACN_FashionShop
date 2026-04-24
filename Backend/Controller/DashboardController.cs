@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Models;
 
-namespace Controllers 
+namespace Controllers
 {
     [ApiController]
     [Route("api/dashboard")]
@@ -15,7 +15,6 @@ namespace Controllers
             _context = context;
         }
 
-        // DASHBOARD TỔNG QUAN
         [HttpGet("summary")]
         public async Task<IActionResult> GetSummary()
         {
@@ -23,7 +22,6 @@ namespace Controllers
             var totalProducts = await _context.products.CountAsync();
             var totalOrders = await _context.orders.CountAsync();
 
-            // Doanh thu = tổng payment đã PAID
             var totalRevenue = await _context.payments
                 .Where(p => p.Status == PaymentStatus.Paid)
                 .SumAsync(p => (decimal?)p.Amount) ?? 0;
@@ -37,24 +35,38 @@ namespace Controllers
             });
         }
 
-        // ĐƠN HÀNG THEO THÁNG (BIỂU ĐỒ)
         [HttpGet("orders-by-month")]
         public async Task<IActionResult> OrdersByMonth()
         {
-            // Lấy dữ liệu ra trước để tránh lỗi EF không dịch được hàm Date sang SQL
-            var orders = await _context.orders.ToListAsync();
-            
+            var orders = await _context.orders
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(od => od.ProductVariant)
+                .Where(o => _context.payments.Any(p => p.OrderId == o.OrderId && p.Status == PaymentStatus.Paid))
+
+                .ToListAsync();
+
             var data = orders
                 .GroupBy(o => new
                 {
                     o.OrderDate.Year,
                     o.OrderDate.Month
                 })
-                .Select(g => new
+                .Select(g =>
                 {
-                    month = $"{g.Key.Month:D2}/{g.Key.Year}",
-                    totalOrders = g.Count(),
-                    totalAmount = g.Sum(x => x.TotalAmount)
+                    var totalRevenue = g.Sum(x => x.TotalAmount);
+                    var totalCost = g.Sum(order =>
+                        order.OrderDetails.Sum(od =>
+                            od.Quantity * (od.ProductVariant?.CostPrice ?? 0)
+                        )
+                    );
+
+                    return new
+                    {
+                        month = $"{g.Key.Month:D2}/{g.Key.Year}",
+                        totalOrders = g.Count(),
+                        doanhThu = totalRevenue,
+                        loiNhuan = totalRevenue - totalCost
+                    };
                 })
                 .OrderBy(x => x.month)
                 .ToList();
@@ -62,7 +74,6 @@ namespace Controllers
             return Ok(data);
         }
 
-        // ĐƠN HÀNG HÔM NAY
         [HttpGet("orders-today")]
         public async Task<IActionResult> OrdersToday()
         {
@@ -78,7 +89,6 @@ namespace Controllers
             });
         }
 
-        // ĐƠN HÀNG TUẦN NÀY
         [HttpGet("orders-this-week")]
         public async Task<IActionResult> OrdersThisWeek()
         {
@@ -96,18 +106,17 @@ namespace Controllers
             });
         }
 
-        // TOP 5 SẢN PHẨM BÁN CHẠY
         [HttpGet("top-products")]
         public async Task<IActionResult> TopProducts()
         {
-            // CẬP NHẬT LIÊN KẾT: OrderDetail -> ProductVariant -> Product
             var data = await _context.orderDetails
                 .Include(od => od.ProductVariant)
                     .ThenInclude(pv => pv.Product)
+                .Where(od => _context.payments.Any(p => p.OrderId == od.OrderId && p.Status == PaymentStatus.Paid))
                 .GroupBy(od => new
                 {
-                    od.ProductVariant.ProductId,     // Gom nhóm theo ID sản phẩm gốc
-                    od.ProductVariant.Product.Name   // Gom nhóm theo Tên sản phẩm gốc
+                    od.ProductVariant.ProductId,
+                    od.ProductVariant.Product.Name
                 })
                 .Select(g => new
                 {

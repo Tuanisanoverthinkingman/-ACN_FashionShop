@@ -13,15 +13,15 @@ import { Promotion, PromotionApplyType, getActivePromotions } from "@/services/p
 export default function ProductPage({ currentUserId, isAdmin }: { currentUserId: number; isAdmin?: boolean }) {
   const { id } = useParams();
   const router = useRouter();
-  
+
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
-  
+
   // --- QUẢN LÝ BIẾN THỂ ---
-  const [selectedColor, setSelectedColor] = useState<string>(""); 
+  const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
   // 1. Lấy danh sách màu sắc duy nhất từ các biến thể (dùng Set để lọc trùng)
@@ -42,7 +42,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       try {
         const data = await getById(Number(id));
         setProduct(data || null);
-        
+
         if (data && data.productVariants && data.productVariants.length > 0) {
           // Mặc định chọn biến thể đầu tiên còn hàng
           const initialVariant = data.productVariants.find(v => v.instock > 0) || data.productVariants[0];
@@ -70,8 +70,8 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
     // Khi đổi màu, tự động chọn size đầu tiên của màu đó còn hàng
-    const firstAvailableSize = product?.productVariants.find(v => v.color === color && v.instock > 0) 
-                             || product?.productVariants.find(v => v.color === color);
+    const firstAvailableSize = product?.productVariants.find(v => v.color === color && v.instock > 0)
+      || product?.productVariants.find(v => v.color === color);
     if (firstAvailableSize) {
       setSelectedVariant(firstAvailableSize);
     }
@@ -100,13 +100,20 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       toast.warning("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
       return;
     }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
     setAdding(true);
     try {
       await addToCart({ productVariantId: selectedVariant.id, quantity: 1 });
-      toast.success("Đã thêm vào giỏ hàng 🎉");
+      toast.success("Đã thêm vào giỏ hàng");
       window.dispatchEvent(new Event("cartChanged"));
     } catch (err) {
-      toast.error("Thêm vào giỏ hàng thất bại 😢");
+      toast.error("Thêm vào giỏ hàng thất bại");
     } finally {
       setAdding(false);
     }
@@ -119,13 +126,12 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
     }
     const token = localStorage.getItem("token");
     if (!token) {
-      toast.warning("Cần đăng nhập để mua hàng");
       router.push("/login");
       return;
     }
     try {
       const res = await orderByProduct(selectedVariant.id, 1);
-      toast.success("Mua ngay thành công 🎉");
+      toast.success("Mua ngay thành công");
       router.push(`/checkout/${res.orderId}`);
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -137,7 +143,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
   };
 
   if (loading) return <p className="text-center mt-10 text-lg">Đang tải sản phẩm...</p>;
-  if (!product) return <p className="text-center mt-10 text-red-500 text-lg">Sản phẩm không tồn tại 😢</p>;
+  if (!product) return <p className="text-center mt-10 text-red-500 text-lg">Sản phẩm không tồn tại</p>;
 
   const currentPrice = selectedVariant?.price || 0;
   const currentStock = selectedVariant?.instock || 0;
@@ -152,7 +158,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
     <div className="bg-gray-100 pt-20 font-['Poppins'] min-h-screen">
       <div className="max-w-6xl mx-auto py-10 px-4">
         <div className="bg-white rounded-xl shadow-md p-6 flex flex-col md:flex-row gap-8">
-          
+
           {/* Hình ảnh */}
           <div className="flex-1 flex justify-center items-start relative">
             {hasDiscount && (
@@ -170,7 +176,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
           {/* Thông tin sản phẩm */}
           <div className="flex-1 flex flex-col gap-5">
             <h1 className="text-3xl font-bold text-gray-900 leading-snug">{product.name}</h1>
-            
+
             <div className="pb-4 border-b border-gray-100">
               <p className="text-3xl font-extrabold flex items-center gap-3">
                 {hasDiscount ? (
@@ -194,8 +200,8 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
                       key={color}
                       onClick={() => handleColorChange(color)}
                       className={`px-4 py-2 border rounded-md font-medium transition-all duration-200 
-                        ${selectedColor === color 
-                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 shadow-sm" 
+                        ${selectedColor === color
+                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 shadow-sm"
                           : "border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
                         }`}
                     >
@@ -221,9 +227,9 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
                       disabled={isOutOfStock}
                       onClick={() => setSelectedVariant(variant)}
                       className={`min-w-[3rem] px-4 py-2 border rounded-md font-medium transition-all duration-200 
-                        ${isSelected 
-                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 shadow-sm" 
-                          : isOutOfStock 
+                        ${isSelected
+                          ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 shadow-sm"
+                          : isOutOfStock
                             ? "border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed line-through relative"
                             : "border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
                         }
@@ -237,7 +243,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
             </div>
 
             <p className="text-sm font-medium mt-1">
-              {currentStock > 0 
+              {currentStock > 0
                 ? <span className="text-green-600 bg-green-50 px-2 py-1 rounded-md">Còn {currentStock} sản phẩm</span>
                 : <span className="text-red-500 bg-red-50 px-2 py-1 rounded-md">Đã hết hàng</span>
               }
@@ -260,7 +266,7 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
                   <FaShoppingCart size={20} />
                 </span>
               </button>
-              
+
               <button
                 onClick={handleBuyNow}
                 disabled={currentStock <= 0}

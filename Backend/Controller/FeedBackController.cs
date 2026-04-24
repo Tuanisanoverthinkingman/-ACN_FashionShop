@@ -38,6 +38,7 @@ namespace Controllers
                 .Include(f => f.User)
                 .Include(f => f.Product);
 
+            // Nếu là User thường thì chỉ lấy feedback của họ (bao gồm cả bị ẩn)
             if (role != "Admin")
             {
                 query = query.Where(f => f.UserId == userId);
@@ -47,14 +48,13 @@ namespace Controllers
             return Ok(feedbacks);
         }
 
-        // GET: api/Feedback/product/{productId} (Dành cho trang chi tiết sản phẩm - Client)
         [HttpGet("product/{productId}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetByProduct(int productId)
         {
             var feedbacks = await _context.Feedbacks
                 .Include(f => f.Product)
-                .Where(f => f.ProductId == productId && !f.Product.IsDeleted)
+                .Where(f => f.ProductId == productId && !f.Product.IsDeleted && f.Status == 0)
                 .Include(f => f.User)
                 .Select(f => new
                 {
@@ -64,7 +64,9 @@ namespace Controllers
                     f.ProductId,
                     f.UserId,
                     UserName = f.User.FullName,
-                    f.CreatedAt
+                    f.CreatedAt,
+                    f.AdminReply,
+                    f.ReplyAt
                 })
                 .OrderByDescending(f => f.Id)
                 .ToListAsync();
@@ -88,7 +90,8 @@ namespace Controllers
                 Rating = dto.Rating,
                 ProductId = dto.ProductId,
                 UserId = userId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Status = 0
             };
 
             _context.Feedbacks.Add(feedback);
@@ -97,7 +100,6 @@ namespace Controllers
             return Ok(new { message = "Gửi đánh giá thành công!", feedback });
         }
 
-        // PUT: api/Feedback/{id} (Cập nhật đánh giá)
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateFeedbackDto dto)
@@ -108,19 +110,35 @@ namespace Controllers
             if (existing == null)
                 return NotFound("Không tìm thấy đánh giá này.");
 
-            // Chỉ chủ nhân hoặc Admin mới được sửa
-            if (role != "Admin" && existing.UserId != userId)
-                return Forbid();
+            if (role == "Admin")
+            {
+                if (dto.Status.HasValue) 
+                    existing.Status = dto.Status.Value;
 
-            existing.Content = dto.Content;
-            existing.Rating = dto.Rating;
-            existing.UpdatedAt = DateTime.UtcNow;
+                if (dto.AdminReply != null)
+                {
+                    existing.AdminReply = dto.AdminReply;
+                    existing.ReplyAt = DateTime.UtcNow;
+                }
+            }
+            else
+            {
+                if (existing.UserId != userId)
+                    return Forbid();
+
+                if (!string.IsNullOrEmpty(dto.Content))
+                    existing.Content = dto.Content;
+                    
+                if (dto.Rating.HasValue)
+                    existing.Rating = dto.Rating.Value;
+
+                existing.UpdatedAt = DateTime.UtcNow;
+            }
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Cập nhật thành công", feedback = existing });
         }
 
-        // DELETE: api/Feedback/{id} (Xóa đánh giá)
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> Delete(int id)
@@ -136,7 +154,7 @@ namespace Controllers
 
             _context.Feedbacks.Remove(feedback);
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Đã xóa đánh giá." });
+            return Ok(new { message = "Đã xóa đánh giá vĩnh viễn khỏi CSDL." });
         }
     }
 
@@ -149,7 +167,9 @@ namespace Controllers
 
     public class UpdateFeedbackDto
     {
-        public string Content { get; set; } = string.Empty;
-        public int Rating { get; set; }
+        public string? Content { get; set; }
+        public int? Rating { get; set; }
+        public int? Status { get; set; }
+        public string? AdminReply { get; set; }
     }
 }

@@ -24,94 +24,102 @@ export default function LoginPage() {
         try {
             const { token, user } = await login(username, password);
 
-            // Redirect theo role
             if (user.role === "Admin") {
                 router.push("/admin");
             } else {
-                router.push("/"); 
+                router.push("/");
             }
         } catch (err: any) {
-            toast.error(err.message || "Đăng nhập thất bại 😢");
+            toast.error(err.message || "Đăng nhập thất bại");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 font-['Poppins']">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-                <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
-                    Đăng nhập
-                </h2>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-[#e2ebf5] font-['Poppins'] p-4">
+            <div className="bg-white/90 backdrop-blur-sm p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 w-full max-w-md">
+                <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+                        Đăng nhập
+                    </h2>
+                    <p className="text-slate-500 mt-2 text-sm">Chào mừng bạn quay trở lại!</p>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Ô Tài khoản */}
                     <div>
-                        <label className="block mb-1 font-medium text-gray-700">Tài khoản</label>
+                        <label className="block mb-2 text-sm font-medium text-slate-600">Tài khoản</label>
                         <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             placeholder="Nhập tài khoản..."
-                            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                            className="w-full bg-slate-50/50 border border-slate-200 text-slate-700 p-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9cbbf1] focus:border-[#9cbbf1] transition-all placeholder:text-slate-400"
                         />
                     </div>
 
-                    <div className="relative">
-                        <label className="block mb-1 font-medium text-gray-700">Mật khẩu</label>
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Nhập mật khẩu..."
-                            className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition pr-10"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-[44px] text-gray-400 hover:text-gray-600 transition"
-                        >
-                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                        </button>
+                    {/* Ô Mật khẩu */}
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-slate-600">Mật khẩu</label>
+                            <button
+                                type="button"
+                                onClick={() => router.push("/forgot-password")}
+                                className="text-sm text-[#79a2eb] hover:text-[#5e8ce1] font-medium transition-colors"
+                            >
+                                Quên mật khẩu?
+                            </button>
+                        </div>
+                        
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Nhập mật khẩu..."
+                                className="w-full bg-slate-50/50 border border-slate-200 text-slate-700 p-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9cbbf1] focus:border-[#9cbbf1] transition-all pr-12 placeholder:text-slate-400"
+                            />
+                            {/* Căn giữa nút icon bằng top-1/2 và -translate-y-1/2 thay vì pixel cứng */}
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                {showPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex justify-between items-center">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition font-semibold"
-                        >
-                            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => router.push("/forgot-password")}
-                            className="ml-4 text-blue-500 hover:underline font-medium transition"
-                        >
-                            Quên mật khẩu?
-                        </button>
-                    </div>
+                    {/* Nút Đăng nhập */}
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-[#8bb4f6] hover:bg-[#7aa6eb] active:scale-[0.98] text-white p-3.5 rounded-xl transition-all font-semibold shadow-sm shadow-blue-200/50 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                    >
+                        {loading ? "Đang xử lý..." : "Đăng nhập"}
+                    </button>
                 </form>
 
-                <div className="mt-4 text-center">
+                {/* Các liên kết phụ trợ */}
+                <div className="mt-8 flex flex-col items-center gap-3 text-sm text-slate-500">
+                    <p>
+                        Chưa có tài khoản?{" "}
+                        <span
+                            onClick={() => router.push("/register")}
+                            className="text-[#79a2eb] hover:text-[#5e8ce1] font-semibold cursor-pointer transition-colors"
+                        >
+                            Đăng ký ngay
+                        </span>
+                    </p>
                     <button
                         type="button"
                         onClick={() => router.push("/send-verify-email")}
-                        className="text-sm text-blue-500 hover:underline transition font-medium"
+                        className="hover:text-slate-700 transition-colors underline underline-offset-4 decoration-slate-300"
                     >
-                        Gửi email xác thực
+                        Gửi lại email xác thực
                     </button>
                 </div>
-
-                <p className="mt-6 text-center text-gray-500 text-sm">
-                    Chưa có tài khoản?{" "}
-                    <span
-                        onClick={() => router.push("/register")}
-                        className="text-blue-500 hover:underline cursor-pointer"
-                    >
-                        Đăng ký ngay
-                    </span>
-                </p>
             </div>
         </div>
     );

@@ -6,8 +6,13 @@ export const getDashboardSummary = async () => {
 };
 
 export const getOrdersByMonth = async () => {
-  const res = await api.get("/api/dashboard/orders-by-month");
-  return res.data;
+  try {
+    const res = await api.get("/api/dashboard/orders-by-month");
+    return res.data;
+  } catch (error) {
+    console.error("Lỗi lấy dữ liệu biểu đồ:", error);
+    throw error;
+  }
 };
 
 export const getOrdersToday = async () => {

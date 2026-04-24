@@ -31,7 +31,6 @@ export interface Promotion {
   categoryNames?: string[];
 }
 
-// Hàm chuẩn hóa dữ liệu từ API
 const transformPromotion = (promo: any): Promotion => ({
   promotionId: promo.promotionId,
   code: promo.code,

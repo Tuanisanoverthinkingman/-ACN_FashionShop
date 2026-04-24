@@ -18,7 +18,7 @@ namespace Models
         [Required]
         [Column(TypeName = "int")]
         [Range(1, 5, ErrorMessage = "Rating must be between 1 and 5.")]
-        public int Rating { get; set; } // Điểm đánh giá từ 1 → 5
+        public int Rating { get; set; }
 
         [ForeignKey("User")]
         public int UserId { get; set; }
@@ -28,6 +28,14 @@ namespace Models
         [ForeignKey("Product")]
         public int ProductId { get; set; }
         public Product Product { get; set; }
+
+        [Column(TypeName = "int")]
+        public int Status { get; set; } = 0;
+
+        [Column(TypeName = "text")]
+        public string? AdminReply { get; set; }
+
+        public DateTime? ReplyAt { get; set; }
 
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -1,23 +1,38 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
-// 1. Cập nhật Interface để khớp với dữ liệu trả về từ API mới
+// 1. Cập nhật Interface khớp với DB mới (Thêm Status và AdminReply)
 export interface FeedbackData {
-  id: number;          
-  productId: number;    
+  id?: number;          
+  productId?: number;    
   content: string;      
   rating: number;       
-  userId: number;     
+  userId?: number;     
   userName?: string;    
+  
+  // --- CÁC TRƯỜNG MỚI CHO ADMIN ---
+  status?: number;       
+  adminReply?: string;   
+  replyAt?: string;      
+  // --------------------------------
+  
   createdAt?: string;
   updatedAt?: string;
 }
 
-// Interface dùng cho Request gửi đi
+// Interface dùng cho Request tạo mới (Bắt buộc đủ trường)
 export interface CreateFeedbackDto {
   productId: number;
   content: string;
   rating: number;
+}
+
+// Interface dùng cho Request cập nhật (Các trường đều là tùy chọn - Optional)
+export interface UpdateFeedbackDto {
+  content?: string;
+  rating?: number;
+  status?: number;
+  adminReply?: string;
 }
 
 // Helper xử lý thông báo lỗi
@@ -49,7 +64,7 @@ export const getFeedbackByProduct = async (productId: number): Promise<FeedbackD
   }
 };
 
-// 4. Tạo feedback mới (Chỉ cho sản phẩm IsDeleted = false)
+// 4. Tạo feedback mới
 export const createFeedback = async (data: CreateFeedbackDto) => {
   try {
     const res = await api.post("/api/Feedback", data);
@@ -60,22 +75,22 @@ export const createFeedback = async (data: CreateFeedbackDto) => {
   }
 };
 
-// 5. Cập nhật feedback (User hoặc Admin)
-export const updateFeedback = async (id: number, data: CreateFeedbackDto) => {
+// 5. Cập nhật feedback (Đã đổi sang UpdateFeedbackDto để linh hoạt ẩn/hiện/trả lời)
+export const updateFeedback = async (id: number, data: UpdateFeedbackDto) => {
   try {
     const res = await api.put(`/api/Feedback/${id}`, data);
-    toast.success("Cập nhật đánh giá thành công");
+    // Tạm bỏ toast success ở đây vì trang Admin đã có tự toast riêng cho từng hành động
     return res.data;
   } catch (error: any) {
     return handleFeedbackError(error, "Cập nhật đánh giá thất bại");
   }
 };
 
-// 6. Xoá feedback (User hoặc Admin)
+// 6. Xoá feedback cứng (Chỉ dùng khi cực kỳ cần thiết)
 export const deleteFeedback = async (id: number) => {
   try {
     const res = await api.delete(`/api/Feedback/${id}`);
-    toast.success(res.data?.message || "Đã xóa đánh giá");
+    toast.success(res.data?.message || "Đã xóa đánh giá vĩnh viễn");
     return res.data;
   } catch (error: any) {
     return handleFeedbackError(error, "Xoá đánh giá thất bại");

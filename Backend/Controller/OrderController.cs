@@ -26,7 +26,45 @@ namespace Controllers
             return int.TryParse(sub, out int id) ? id : 0;
         }
 
-        // 1. Tạo đơn hàng từ giỏ hàng (CÓ TRỪ KHO)
+        private decimal GetDiscountedPrice(ProductVariant variant, List<Promotion> activePromotions, int userId)
+        {
+            decimal originalPrice = variant.Price;
+            if (activePromotions == null || !activePromotions.Any()) return originalPrice;
+
+            double maxDiscount = 0; // Schema của bạn DiscountPercent là double
+
+            foreach (var promo in activePromotions)
+            {
+                bool isApplicable = false;
+
+                if (promo.ApplyType == PromotionApplyType.General) 
+                {
+                    isApplicable = true;
+                }
+                else if (promo.ApplyType == PromotionApplyType.Product && promo.PromotionProducts != null)
+                {
+                    isApplicable = promo.PromotionProducts.Any(pp => pp.ProductId == variant.ProductId);
+                }
+                else if (promo.ApplyType == PromotionApplyType.Category && promo.PromotionCategories != null && variant.Product != null)
+                {
+                    isApplicable = promo.PromotionCategories.Any(pc => pc.CategoryId == variant.Product.CategoryId);
+                }
+                else if (promo.ApplyType == PromotionApplyType.User && promo.UserPromotions != null)
+                {
+                    // Giả định bảng UserPromotion của bạn có cột UserId
+                    isApplicable = promo.UserPromotions.Any(up => up.UserId == userId);
+                }
+
+                // Nếu thỏa mãn điều kiện, so sánh lấy mức giảm sâu nhất
+                if (isApplicable && promo.DiscountPercent > maxDiscount)
+                {
+                    maxDiscount = promo.DiscountPercent;
+                }
+            }
+            return originalPrice * (1m - (decimal)(maxDiscount / 100));
+        }
+
+        // 1. Tạo đơn hàng từ giỏ hàng
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> CreateOrder([FromBody] List<int> cartItemIds)
@@ -40,14 +78,25 @@ namespace Controllers
 
                 var selectedItems = await _context.cartItems
                     .Include(c => c.ProductVariant)
-                        .ThenInclude(v => v.Product) // Để lấy tên SP báo lỗi nếu cần
+                        .ThenInclude(v => v.Product) 
                     .Where(c => c.UserId == userId && cartItemIds.Contains(c.CartItemId))
                     .ToListAsync();
 
                 if (!selectedItems.Any())
                     return BadRequest(new { message = "Không tìm thấy sản phẩm trong giỏ hàng!" });
 
-                // BƯỚC 1: KIỂM TRA TỒN KHO TRƯỚC
+                // Lấy danh sách mã giảm giá đang chạy
+                var now = DateTime.Now;
+                var activePromotions = await _context.promotions
+                    .Include(p => p.PromotionProducts)
+                    .Include(p => p.PromotionCategories)
+                    .Include(p => p.UserPromotions)
+                    .Where(p => p.Status == PromotionStatus.Active && p.StartDate <= now && p.EndDate >= now)
+                    .ToListAsync();
+
+                decimal totalOrderAmount = 0;
+                var orderDetailsList = new List<OrderDetail>();
+
                 foreach (var item in selectedItems)
                 {
                     if (item.ProductVariant == null)
@@ -60,41 +109,35 @@ namespace Controllers
                             message = $"Sản phẩm {item.ProductVariant.Product?.Name} - Size {item.ProductVariant.Size} chỉ còn {item.ProductVariant.Instock} sản phẩm!"
                         });
                     }
+
+                    // TÍNH GIÁ SALE Ở ĐÂY
+                    decimal finalSalePrice = GetDiscountedPrice(item.ProductVariant, activePromotions, userId);
+                    totalOrderAmount += finalSalePrice * item.Quantity;
+
+                    orderDetailsList.Add(new OrderDetail
+                    {
+                        ProductVariantId = item.ProductVariantId,
+                        Quantity = item.Quantity,
+                        UnitPrice = finalSalePrice // LƯU GIÁ ĐÃ GIẢM
+                    });
+
                 }
 
-                // BƯỚC 2: TÍNH TIỀN & TẠO ĐƠN
-                decimal total = selectedItems.Sum(c => c.ProductVariant.Price * c.Quantity);
                 var newOrder = new Order
                 {
                     UserId = userId,
-                    TotalAmount = total,
+                    TotalAmount = totalOrderAmount,
                     OrderDate = DateTime.Now,
-                    OrderStatus = "Pending"
+                    OrderStatus = "Pending",
+                    OrderDetails = orderDetailsList
                 };
 
                 _context.orders.Add(newOrder);
-                await _context.SaveChangesAsync();
-
-                // BƯỚC 3: LƯU CHI TIẾT & TRỪ KHO
-                foreach (var item in selectedItems)
-                {
-                    // Trừ tồn kho
-                    item.ProductVariant.Instock -= item.Quantity;
-
-                    _context.orderDetails.Add(new OrderDetail
-                    {
-                        OrderId = newOrder.OrderId,
-                        ProductVariantId = item.ProductVariantId,
-                        Quantity = item.Quantity,
-                        UnitPrice = item.ProductVariant.Price
-                    });
-                }
-
                 _context.cartItems.RemoveRange(selectedItems);
+                
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync(); // Xác nhận giao dịch hoàn tất
+                await transaction.CommitAsync(); 
 
-                // Trả về dữ liệu đầy đủ
                 var createdOrder = await _context.orders
                     .Include(o => o.OrderDetails).ThenInclude(od => od.ProductVariant).ThenInclude(v => v.Product)
                     .FirstOrDefaultAsync(o => o.OrderId == newOrder.OrderId);
@@ -132,7 +175,7 @@ namespace Controllers
             var orders = await _context.orders
                 .Where(o => o.UserId == userId)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                    .ThenInclude(d => d.ProductVariant) 
                         .ThenInclude(v => v.Product)
                 .Include(o => o.Payments)
                 .ToListAsync();
@@ -146,7 +189,7 @@ namespace Controllers
         {
             var order = await _context.orders
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                    .ThenInclude(d => d.ProductVariant) 
                         .ThenInclude(v => v.Product)
                 .Include(p => p.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
@@ -183,7 +226,7 @@ namespace Controllers
             return Ok(new { message = "Xoá đơn hàng thành công!" });
         }
 
-        // Tạo đơn trực tiếp (Mua ngay)
+        // 2. Tạo đơn trực tiếp (Mua ngay)
         [HttpPost("order-by-product")]
         [Authorize]
         public async Task<IActionResult> OrderByProduct([FromBody] OrderByProductDto dto)
@@ -199,36 +242,45 @@ namespace Controllers
                 if (variant == null)
                     return NotFound(new { message = "Phân loại sản phẩm không tồn tại!" });
 
-                // KIỂM TRA TỒN KHO
                 if (variant.Instock < dto.Quantity)
                 {
                     return BadRequest(new { message = $"Sản phẩm này chỉ còn {variant.Instock} sản phẩm!" });
                 }
 
-                var total = variant.Price * dto.Quantity;
+                // Lấy khuyến mãi
+                var now = DateTime.Now;
+                var activePromotions = await _context.promotions
+                    .Include(p => p.PromotionProducts)
+                    .Include(p => p.PromotionCategories)
+                    .Include(p => p.UserPromotions)
+                    .Where(p => p.Status == PromotionStatus.Active && p.StartDate <= now && p.EndDate >= now)
+                    .ToListAsync();
+
+                // TÍNH GIÁ SALE Ở ĐÂY
+                decimal finalSalePrice = GetDiscountedPrice(variant, activePromotions, userId);
+                var total = finalSalePrice * dto.Quantity;
+
+                var orderListDetails = new List<OrderDetail>
+                {
+                    new OrderDetail
+                    {
+                        ProductVariantId = variant.Id,
+                        Quantity = dto.Quantity,
+                        UnitPrice = finalSalePrice // LƯU GIÁ ĐÃ GIẢM
+                    }
+                };
+
                 var order = new Order
                 {
                     UserId = userId,
                     TotalAmount = total,
                     OrderDate = DateTime.Now,
-                    OrderStatus = "Pending"
+                    OrderStatus = "Pending",
+                    OrderDetails = orderListDetails
                 };
 
                 _context.orders.Add(order);
-                await _context.SaveChangesAsync();
 
-                // TRỪ KHO & LƯU CHI TIẾT
-                variant.Instock -= dto.Quantity;
-
-                var orderDetail = new OrderDetail
-                {
-                    OrderId = order.OrderId,
-                    ProductVariantId = variant.Id,
-                    Quantity = dto.Quantity,
-                    UnitPrice = variant.Price
-                };
-
-                _context.orderDetails.Add(orderDetail);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -236,7 +288,7 @@ namespace Controllers
                     .Include(o => o.OrderDetails).ThenInclude(d => d.ProductVariant).ThenInclude(v => v.Product)
                     .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
 
-                return Ok(new { message = "Thanh toán thành công!", order = createdOrder });
+                return Ok(new { message = "Tạo đơn hàng thành công!", order = createdOrder });
             }
             catch (Exception ex)
             {
@@ -253,7 +305,7 @@ namespace Controllers
             var orders = await _context.orders
                 .Include(o => o.User)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(d => d.ProductVariant) // ĐỔI CHỖ NÀY
+                    .ThenInclude(d => d.ProductVariant)
                         .ThenInclude(v => v.Product)
                 .Include(o => o.Payments)
                 .Where(o => o.Payments.Any())
