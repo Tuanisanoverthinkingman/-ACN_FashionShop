@@ -17,7 +17,6 @@ namespace Controllers
             _context = context;
         }
 
-        // --- REQUEST DTOs ---
         public class CreateUserRequest
         {
             public string Username { get; set; } = null!;
@@ -27,7 +26,7 @@ namespace Controllers
             public string Phone { get; set; } = null!;
         }
 
-        // 1. Đăng ký người dùng (Public)
+        // 1. Đăng ký người dùng
         [HttpPost("User")]
         public async Task<ActionResult<User>> CreateUser([FromBody] CreateUserRequest request)
         {
@@ -59,7 +58,7 @@ namespace Controllers
             return CreatedAtAction(nameof(GetUser), new { id = user.Id }, new { message = "Đăng ký thành công!", userId = user.Id });
         }
 
-        // 2. Tạo Admin (Chỉ Admin mới có quyền tạo Admin khác)
+        // 2. Tạo Admin
         [HttpPost("Admin")]
         public async Task<ActionResult<User>> CreateAdmin([FromBody] CreateUserRequest request)
         {
@@ -75,7 +74,7 @@ namespace Controllers
                 Role = "Admin",
                 Phone = request.Phone,
                 IsActive = true,
-                IsVerified = true, // Admin mặc định được verify
+                IsVerified = true,
                 EmailVerificationSentAt = DateTime.UtcNow
             };
 
@@ -85,20 +84,35 @@ namespace Controllers
             return Ok(new { message = "Tạo tài khoản Admin thành công." });
         }
 
-        // 3. Lấy tất cả user (Chỉ lấy User thường và chưa bị xóa mềm)
+        // 3. Lấy tất cả user
         [HttpGet("getAll")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<IEnumerable<User>>> GetAllUser()
+        public async Task<IActionResult> GetAllUser()
         {
-            // Trả về cả Active và Inactive để Admin quản lý, nhưng loại bỏ chính mình/Admin khác
             var users = await _context.users
                 .Where(u => u.Role != "Admin")
                 .OrderByDescending(u => u.Id)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Username,
+                    u.Email,
+                    u.FullName,
+                    u.Phone,
+                    u.CreateAt,
+                    u.IsActive,
+                    u.IsVerified,
+                    StatusText = u.IsActive == false ? "Đã khóa"
+                               : (u.IsVerified == false && u.EmailVerificationSentAt.HasValue && u.EmailVerificationSentAt.Value.AddHours(24) < DateTime.UtcNow) ? "Chưa xác thực"
+                               : (u.IsVerified == false) ? "Chờ xác thực"
+                               : "Đang hoạt động"
+                })
                 .ToListAsync();
+
             return Ok(users);
         }
 
-        // 4. Thông tin cá nhân (Me)
+        // 4. Thông tin cá nhân
         [Authorize]
         [HttpGet("me")]
         public async Task<ActionResult<User>> GetCurrentUser()
@@ -121,18 +135,23 @@ namespace Controllers
             var user = await _context.users.FindAsync(id);
             if (user == null) return NotFound(new { message = "Không tìm thấy người dùng." });
 
-            // Bảo mật: Không cho phép Admin tự vô hiệu hóa chính mình hoặc Admin khác qua đây
             if (user.Role == "Admin")
                 return BadRequest(new { message = "Không thể thay đổi trạng thái tài khoản Quản trị viên." });
 
             user.IsActive = !user.IsActive;
+
+            if (user.IsActive == true)
+            {
+                user.IsVerified = true;
+            }
+
             await _context.SaveChangesAsync();
 
-            string status = user.IsActive ? "kích hoạt" : "vô hiệu hóa";
+            string status = user.IsActive ? "kích hoạt và xác thực" : "vô hiệu hóa";
             return Ok(new { message = $"Đã {status} tài khoản {user.Username}.", isActive = user.IsActive });
         }
 
-        // 6. Xóa vĩnh viễn (Cẩn trọng khi dùng)
+        // 6. Xóa vĩnh viễn
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteUser(int id)
@@ -143,7 +162,6 @@ namespace Controllers
             if (user.Role == "Admin")
                 return BadRequest(new { message = "Không thể xóa tài khoản Admin." });
 
-            // Kiểm tra ràng buộc dữ liệu: Nếu user đã có Order, không nên xóa cứng
             bool hasOrders = await _context.orders.AnyAsync(o => o.UserId == id);
             if (hasOrders)
                 return BadRequest(new { message = "User đã có lịch sử đơn hàng, chỉ có thể vô hiệu hóa (Toggle Active)." });
@@ -159,7 +177,6 @@ namespace Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordRequest request)
         {
-            // Bảo mật: User chỉ được đổi mật khẩu của chính mình
             var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             if (currentUserId != id) return Forbid();
 
@@ -194,13 +211,38 @@ namespace Controllers
             return Ok(new { message = "Cập nhật thông tin thành công!", user });
         }
 
-        // GetUser cho CreatedAtAction
         [HttpGet("detail/{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<User>> GetUser(int id)
         {
             var user = await _context.users.FindAsync(id);
             return user == null ? NotFound() : Ok(user);
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateUserByAdmin(int id, [FromBody] UpdateUserByAdminRequest request)
+        {
+            var user = await _context.users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Không tìm thấy người dùng." });
+
+            if (await _context.users.AnyAsync(u => u.Email == request.Email && u.Id != id))
+                return BadRequest(new { message = "Email này đã được sử dụng bởi tài khoản khác." });
+
+            if (await _context.users.AnyAsync(u => u.Phone == request.Phone && u.Id != id))
+                return BadRequest(new { message = "Số điện thoại này đã được sử dụng." });
+
+            user.FullName = request.FullName;
+            user.Phone = request.Phone;
+            user.Email = request.Email;
+            
+            if (!string.IsNullOrEmpty(request.Role) && (request.Role == "Admin" || request.Role == "User"))
+            {
+                user.Role = request.Role;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Cập nhật thông tin người dùng thành công!" });
         }
     }
 
@@ -214,4 +256,12 @@ namespace Controllers
         public string OldPassword { get; set; } = null!;
         public string NewPassword { get; set; } = null!;
     }
+
+    public class UpdateUserByAdminRequest
+        {
+            public string FullName { get; set; } = null!;
+            public string Phone { get; set; } = null!;
+            public string Email { get; set; } = null!;
+            public string Role { get; set; } = null!;
+        }
 }

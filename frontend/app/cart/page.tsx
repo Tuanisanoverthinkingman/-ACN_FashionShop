@@ -54,7 +54,7 @@ export default function CartPage() {
             id: prodInfo.id,
             name: prodInfo.name,
             imageUrl: prodInfo.imageUrl,
-            price: price, // Giá đã được gán chính xác!
+            price: price,
             categoryId: prodInfo.categoryId,
           }
           : undefined,
@@ -62,7 +62,6 @@ export default function CartPage() {
     });
   };
 
-  // --- Load cart + promotions ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -75,7 +74,6 @@ export default function CartPage() {
         setPromotions(promoData || []);
         setUserPromotions(userPromoData || []);
 
-        // Sử dụng hàm helper đã an toàn
         setCartItems(formatCartData(cartData));
       } catch (err) {
         console.error(err);
@@ -86,7 +84,6 @@ export default function CartPage() {
     fetchData();
   }, []);
 
-  // --- HÀM TÍNH GIÁ KHUYẾN MÃI (ĐÃ CHUẨN HÓA THEO INTERFACE PROMOTION) ---
   const getDiscountedPrice = (product: CartProduct | undefined) => {
     if (!product) return 0;
 
@@ -95,7 +92,6 @@ export default function CartPage() {
     promotions.forEach(promo => {
       let isApplicable = false;
 
-      // Dùng trực tiếp Enum PromotionApplyType bạn đã export
       if (promo.applyType === PromotionApplyType.General) {
         isApplicable = true;
       }
@@ -110,7 +106,6 @@ export default function CartPage() {
         }
       }
 
-      // Lấy mức giảm sâu nhất
       if (isApplicable && promo.discountPercent > maxDiscount) {
         maxDiscount = promo.discountPercent;
       }
@@ -119,34 +114,29 @@ export default function CartPage() {
     return Math.round(product.price * (1 - maxDiscount / 100));
   };
 
-  // --- Chỉnh số lượng ---
   const handleQuantityChange = async (cartItemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
     try {
       await updateCartQuantity({ cartItemId, quantity: newQuantity });
       const data = await getCart();
       setCartItems(formatCartData(data));
-      // --- Cập nhật NavBar ---
       window.dispatchEvent(new Event("cartChanged"));
     } catch (err) {
       console.error(err);
     }
   };
 
-  // --- Xóa sản phẩm ---
   const handleDelete = async (cartItemId: number) => {
     try {
       await deleteFromCart(cartItemId);
       setCartItems(prev => prev.filter(item => item.cartItemId !== cartItemId));
       setSelectedItems(prev => prev.filter(id => id !== cartItemId));
-      // --- Cập nhật NavBar ---
+
       window.dispatchEvent(new Event("cartChanged"));
     } catch (err) {
       console.error(err);
     }
   };
-
-  // --- Chọn sản phẩm ---
   const handleSelectItem = (cartItemId: number, checked: boolean) => {
     setSelectedItems(prev => (checked ? [...prev, cartItemId] : prev.filter(id => id !== cartItemId)));
   };
@@ -156,7 +146,6 @@ export default function CartPage() {
     setSelectedItems(checked ? cartItems.map(item => item.cartItemId) : []);
   };
 
-  // --- Thanh toán ---
   const handleCheckout = async () => {
     if (selectedItems.length === 0) {
       toast.warn("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán!");
@@ -171,22 +160,20 @@ export default function CartPage() {
       const data = await getCart();
       setCartItems(formatCartData(data));
 
-      // --- Cập nhật NavBar ---
       window.dispatchEvent(new Event("cartChanged"));
-      router.push(`/checkout/${order.orderId || order.order.orderId}`); // Dự phòng trường hợp API trả về lồng nhau
+      router.push(`/checkout/${order.orderId || order.order.orderId}`);
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.message || "Thanh toán thất bại, vui lòng thử lại!");
     }
   };
 
-  // --- Tổng tiền ---
   const totalPrice = cartItems
     .filter(item => selectedItems.includes(item.cartItemId))
     .reduce((sum, item) => sum + getDiscountedPrice(item.product) * item.quantity, 0);
 
   if (loading) return <div className="pt-[90px] text-center mt-10">Đang tải giỏ hàng...</div>;
-  if (cartItems.length === 0) return <div className="pt-[90px] text-center mt-10 font-medium text-gray-500">Giỏ hàng của bạn đang trống 😢</div>;
+  if (cartItems.length === 0) return <div className="pt-[90px] text-center mt-10 font-medium text-gray-500">Giỏ hàng của bạn đang trống</div>;
 
   return (
     <div className="pt-[90px] bg-white max-w-7xl mx-auto px-6 py-8 min-h-screen">

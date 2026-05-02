@@ -31,7 +31,7 @@ namespace Controllers
             decimal originalPrice = variant.Price;
             if (activePromotions == null || !activePromotions.Any()) return originalPrice;
 
-            double maxDiscount = 0; // Schema của bạn DiscountPercent là double
+            double maxDiscount = 0;
 
             foreach (var promo in activePromotions)
             {
@@ -51,11 +51,9 @@ namespace Controllers
                 }
                 else if (promo.ApplyType == PromotionApplyType.User && promo.UserPromotions != null)
                 {
-                    // Giả định bảng UserPromotion của bạn có cột UserId
                     isApplicable = promo.UserPromotions.Any(up => up.UserId == userId);
                 }
 
-                // Nếu thỏa mãn điều kiện, so sánh lấy mức giảm sâu nhất
                 if (isApplicable && promo.DiscountPercent > maxDiscount)
                 {
                     maxDiscount = promo.DiscountPercent;
@@ -85,7 +83,6 @@ namespace Controllers
                 if (!selectedItems.Any())
                     return BadRequest(new { message = "Không tìm thấy sản phẩm trong giỏ hàng!" });
 
-                // Lấy danh sách mã giảm giá đang chạy
                 var now = DateTime.Now;
                 var activePromotions = await _context.promotions
                     .Include(p => p.PromotionProducts)
@@ -110,7 +107,6 @@ namespace Controllers
                         });
                     }
 
-                    // TÍNH GIÁ SALE Ở ĐÂY
                     decimal finalSalePrice = GetDiscountedPrice(item.ProductVariant, activePromotions, userId);
                     totalOrderAmount += finalSalePrice * item.Quantity;
 
@@ -118,7 +114,7 @@ namespace Controllers
                     {
                         ProductVariantId = item.ProductVariantId,
                         Quantity = item.Quantity,
-                        UnitPrice = finalSalePrice // LƯU GIÁ ĐÃ GIẢM
+                        UnitPrice = finalSalePrice
                     });
 
                 }
@@ -226,7 +222,7 @@ namespace Controllers
             return Ok(new { message = "Xoá đơn hàng thành công!" });
         }
 
-        // 2. Tạo đơn trực tiếp (Mua ngay)
+        // 2. Tạo đơn trực tiếp
         [HttpPost("order-by-product")]
         [Authorize]
         public async Task<IActionResult> OrderByProduct([FromBody] OrderByProductDto dto)
@@ -247,7 +243,6 @@ namespace Controllers
                     return BadRequest(new { message = $"Sản phẩm này chỉ còn {variant.Instock} sản phẩm!" });
                 }
 
-                // Lấy khuyến mãi
                 var now = DateTime.Now;
                 var activePromotions = await _context.promotions
                     .Include(p => p.PromotionProducts)
@@ -256,7 +251,6 @@ namespace Controllers
                     .Where(p => p.Status == PromotionStatus.Active && p.StartDate <= now && p.EndDate >= now)
                     .ToListAsync();
 
-                // TÍNH GIÁ SALE Ở ĐÂY
                 decimal finalSalePrice = GetDiscountedPrice(variant, activePromotions, userId);
                 var total = finalSalePrice * dto.Quantity;
 
@@ -266,7 +260,7 @@ namespace Controllers
                     {
                         ProductVariantId = variant.Id,
                         Quantity = dto.Quantity,
-                        UnitPrice = finalSalePrice // LƯU GIÁ ĐÃ GIẢM
+                        UnitPrice = finalSalePrice 
                     }
                 };
 
@@ -297,7 +291,6 @@ namespace Controllers
             }
         }
 
-        // Lấy các đơn hàng đã có ít nhất 1 payment
         [HttpGet("paid")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetPaidOrders()

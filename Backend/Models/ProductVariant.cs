@@ -10,7 +10,6 @@ namespace Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        // Khóa ngoại liên kết về bảng Product
         [Required]
         [ForeignKey("Product")]
         public int ProductId { get; set; }

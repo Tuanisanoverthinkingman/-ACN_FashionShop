@@ -85,7 +85,6 @@ namespace Controllers
             if (category == null)
                 return NotFound(new { message = "Danh mục không tồn tại." });
 
-            // CẬP NHẬT: Chỉ kiểm tra các sản phẩm CHƯA BỊ XÓA MỀM
             bool hasActiveProducts = await _context.products
                 .AnyAsync(p => p.CategoryId == id && !p.IsDeleted);
 

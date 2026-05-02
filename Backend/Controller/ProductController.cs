@@ -60,13 +60,14 @@ namespace Controllers
 
             return Ok(new { message = "Sản phẩm đã được khôi phục thành công" });
         }
+
         //Lấy sản phẩm theo id
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var product = await _context.products
                 .Include(p => p.Category)
-                .Include(p => p.ProductVariants) // THÊM DÒNG NÀY
+                .Include(p => p.ProductVariants)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (product == null)
@@ -95,7 +96,6 @@ namespace Controllers
                 CategoryId = request.CategoryId,
                 CreateAt = DateTime.UtcNow,
 
-                // LOGIC MỚI: Tự động tạo 1 phân loại hàng mặc định từ dữ liệu form cũ
                 ProductVariants = new List<ProductVariant>
                 {
                     new ProductVariant
@@ -187,7 +187,6 @@ namespace Controllers
                                 CategoryId = category.Id,
                                 CreateAt = DateTime.UtcNow,
 
-                                // LOGIC MỚI: Đưa Price, CostPrice, Instock vào Biến thể mặc định
                                 ProductVariants = new List<ProductVariant>
                                 {
                                     new ProductVariant
@@ -237,7 +236,6 @@ namespace Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            // LOGIC MỚI: Kéo thêm bảng ProductVariants lên để update
             var product = await _context.products
                 .Include(p => p.ProductVariants)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -255,7 +253,6 @@ namespace Controllers
             if (request.ImageUrl == null) product.ImageUrl = null;
             else product.ImageUrl = request.ImageUrl;
 
-            // LOGIC MỚI: Cập nhật giá và kho vào biến thể đầu tiên (mặc định)
             var firstVariant = product.ProductVariants.FirstOrDefault();
             if (firstVariant != null)
             {
@@ -265,7 +262,6 @@ namespace Controllers
             }
             else
             {
-                // Nếu sản phẩm này trước đó chưa có biến thể nào, tạo mới
                 product.ProductVariants.Add(new ProductVariant
                 {
                     Size = "FreeSize",
@@ -285,7 +281,6 @@ namespace Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            // Tìm sản phẩm bao gồm cả những cái đã xóa để tránh lỗi logic
             var product = await _context.products
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -299,7 +294,6 @@ namespace Controllers
                 return BadRequest(new { message = "Sản phẩm này đã nằm trong danh sách ngưng bán rồi." });
             }
 
-            // Thực hiện xóa mềm
             product.IsDeleted = true;
 
             _context.products.Update(product);
@@ -326,7 +320,6 @@ namespace Controllers
             return Ok(products);
         }
 
-        //Lấy danh sách sản phẩm theo từ khoá danh mục (ÁO, QUẦN, PHỤ KIỆN)
         [HttpGet("group/{keyword}")]
         public async Task<IActionResult> GetByCategoryGroup(string keyword)
         {
@@ -349,7 +342,34 @@ namespace Controllers
             return Ok(products);
         }
 
-        // Lấy danh sách sản phẩm ĐANG SALE 
+        [HttpGet("quick-search")]
+        public async Task<IActionResult> QuickSearch([FromQuery] string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Ok(new { categories = new List<object>(), products = new List<object>() });
+
+            string searchTerm = query.ToLower().Trim();
+
+            var categories = await _context.categories
+                .Where(c => c.Name.ToLower().Contains(searchTerm))
+                .Select(c => new { id = c.Id, name = c.Name })
+                .Take(4)
+                .ToListAsync();
+
+            var products = await _context.products
+                .Where(p => !p.IsDeleted && p.Name.ToLower().Contains(searchTerm))
+                .Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    imageUrl = p.ImageUrl
+                })
+                .Take(4)
+                .ToListAsync();
+
+            return Ok(new { categories, products });
+        }
+        
         [HttpGet("on-sale/{keyword?}")]
         public async Task<IActionResult> GetSaleProducts(string? keyword = null)
         {
@@ -368,7 +388,6 @@ namespace Controllers
 
             bool hasGeneralPromo = activePromos.Any(p => p.ApplyType == PromotionApplyType.General);
 
-            // THÊM INCLUDE PRODUCTVARIANTS VÀO QUERY
             var query = _context.products
                 .Include(p => p.Category)
                 .Include(p => p.ProductVariants)

@@ -150,7 +150,6 @@ namespace Controllers
             if (validateResult != null)
                 return validateResult;
 
-            // Update field
             promo.Code = request.Code;
             promo.DiscountPercent = request.DiscountPercent;
             promo.Description = request.Description;
@@ -158,7 +157,6 @@ namespace Controllers
             promo.StartDate = request.StartDate;
             promo.EndDate = request.EndDate;
 
-            // Clear toàn bộ mapping cũ
             promo.PromotionProducts.Clear();
             promo.PromotionCategories.Clear();
             if (request.ApplyType != PromotionApplyType.User)
@@ -246,13 +244,11 @@ namespace Controllers
                 p.StartDate,
                 p.EndDate,
                 p.ApplyType,
-                // CHỈ LẤY Product chưa bị xóa (IsDeleted = false)
                 ProductIds = p.PromotionProducts.Where(pp => pp.Product != null && !pp.Product.IsDeleted).Select(pp => pp.ProductId),
                 ProductNames = p.PromotionProducts.Where(pp => pp.Product != null && !pp.Product.IsDeleted).Select(pp => pp.Product.Name),
                 CategoryIds = p.PromotionCategories.Select(pc => pc.CategoryId),
                 CategoryNames = p.PromotionCategories.Select(pc => pc.Category.Name)
             })
-            // Lọc bỏ những promo mà sau khi lọc sản phẩm bị xóa thì không còn sản phẩm nào (đối với loại ApplyType.Product)
             .Where(p => p.ApplyType != PromotionApplyType.Product || p.ProductIds.Any())
             .ToList();
 
@@ -270,7 +266,7 @@ namespace Controllers
                     p.Status == PromotionStatus.Active &&
                     p.StartDate <= now &&
                     p.EndDate >= now &&
-                    p.ApplyType == PromotionApplyType.General // Chỉ General
+                    p.ApplyType == PromotionApplyType.General
                 )
                 .ToListAsync();
 
@@ -288,7 +284,6 @@ namespace Controllers
             return Ok(result);
         }
 
-        // --- HELPER METHODS ---
         private void UpdatePromoFields(Promotion promo, PromotionRequest request)
         {
             promo.DiscountPercent = request.DiscountPercent;
@@ -335,7 +330,6 @@ namespace Controllers
 
             var fakePromos = new List<Promotion>();
 
-            // --- Product (2 cái) ---
             for (int i = 1; i <= 2; i++)
             {
                 fakePromos.Add(new Promotion
@@ -350,12 +344,11 @@ namespace Controllers
                     CreatedAt = now,
                     PromotionProducts = new List<PromotionProduct>
             {
-                new PromotionProduct { ProductId = i } // fake productId
+                new PromotionProduct { ProductId = i }
             }
                 });
             }
 
-            // Category (2 cái)
             for (int i = 1; i <= 2; i++)
             {
                 fakePromos.Add(new Promotion
@@ -370,12 +363,11 @@ namespace Controllers
                     CreatedAt = now,
                     PromotionCategories = new List<PromotionCategory>
             {
-                new PromotionCategory { CategoryId = i } // fake categoryId
+                new PromotionCategory { CategoryId = i }
             }
                 });
             }
 
-            // --- User (2 cái) ---
             if (_context.users.Any())
             {
                 var existingUserIds = _context.users.Take(2).Select(u => u.Id).ToList();
@@ -400,7 +392,6 @@ namespace Controllers
                 }
             }
 
-            // General (2 cái)
             for (int i = 1; i <= 2; i++)
             {
                 fakePromos.Add(new Promotion
@@ -413,7 +404,6 @@ namespace Controllers
                     EndDate = now.AddDays(7),
                     Status = PromotionStatus.Active,
                     CreatedAt = now
-                    // Loại General không cần mapping product/category/user
                 });
             }
 
@@ -444,7 +434,6 @@ namespace Controllers
         }
     }
 
-    // REQUEST DTO
     public class PromotionRequest
     {
         public string Code { get; set; } = null!;

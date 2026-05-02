@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { login } from "@/services/auth-services";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 
 export default function LoginPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirectUrl = searchParams.get("redirect");
+
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -22,10 +25,14 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            const { token, user } = await login(username, password);
+            const { user } = await login(username, password);
+
+            toast.success("Đăng nhập thành công!");
 
             if (user.role === "Admin") {
                 router.push("/admin");
+            } else if (redirectUrl) {
+                router.push(redirectUrl);
             } else {
                 router.push("/");
             }
@@ -47,7 +54,6 @@ export default function LoginPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Ô Tài khoản */}
                     <div>
                         <label className="block mb-2 text-sm font-medium text-slate-600">Tài khoản</label>
                         <input
@@ -59,19 +65,9 @@ export default function LoginPage() {
                         />
                     </div>
 
-                    {/* Ô Mật khẩu */}
                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-slate-600">Mật khẩu</label>
-                            <button
-                                type="button"
-                                onClick={() => router.push("/forgot-password")}
-                                className="text-sm text-[#79a2eb] hover:text-[#5e8ce1] font-medium transition-colors"
-                            >
-                                Quên mật khẩu?
-                            </button>
-                        </div>
-                        
+                        <label className="block text-sm font-medium text-slate-600">Mật khẩu</label>
+
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}
@@ -80,7 +76,6 @@ export default function LoginPage() {
                                 placeholder="Nhập mật khẩu..."
                                 className="w-full bg-slate-50/50 border border-slate-200 text-slate-700 p-3.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9cbbf1] focus:border-[#9cbbf1] transition-all pr-12 placeholder:text-slate-400"
                             />
-                            {/* Căn giữa nút icon bằng top-1/2 và -translate-y-1/2 thay vì pixel cứng */}
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
@@ -89,9 +84,17 @@ export default function LoginPage() {
                                 {showPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
                             </button>
                         </div>
+                        <div className="flex justify-end mt-2">
+                            <button
+                                type="button"
+                                onClick={() => router.push("/forgot-password")}
+                                className="text-sm text-[#79a2eb] hover:text-[#5e8ce1] font-medium transition-colors"
+                            >
+                                Quên mật khẩu?
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Nút Đăng nhập */}
                     <button
                         type="submit"
                         disabled={loading}
@@ -101,7 +104,6 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                {/* Các liên kết phụ trợ */}
                 <div className="mt-8 flex flex-col items-center gap-3 text-sm text-slate-500">
                     <p>
                         Chưa có tài khoản?{" "}

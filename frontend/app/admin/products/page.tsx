@@ -203,11 +203,11 @@ export default function ProductsPage() {
       onFilter: (value: any, record: Product) => record.isDeleted === value,
       render: (_: any, record: Product) => (
         record.isDeleted ? (
-          <span className="inline-block min-w-[80px] text-center text-red-500 bg-red-900/30 border border-red-500 px-2 py-1 rounded text-xs">
+          <span className="inline-block min-w-[80px] text-center text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded text-xs font-medium">
             Ngưng bán
           </span>
         ) : (
-          <span className="inline-block min-w-[80px] text-center text-green-500 bg-green-900/30 border border-green-500 px-2 py-1 rounded text-xs">
+          <span className="inline-block min-w-[80px] text-center text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded text-xs font-medium">
             Đang bán
           </span>
         )
@@ -246,7 +246,7 @@ export default function ProductsPage() {
 
       <Space className="mb-4">
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>Thêm sản phẩm</Button>
-        <Upload
+        {/* <Upload
           accept=".xlsx"
           maxCount={1}
           fileList={excelFileList}
@@ -254,7 +254,7 @@ export default function ProductsPage() {
           showUploadList={false}
         >
           <Button icon={<UploadOutlined />}>Import Excel</Button>
-        </Upload>
+        </Upload> */}
       </Space>
 
       <Table rowKey="id" dataSource={products} columns={columns} loading={loading} bordered />
@@ -265,7 +265,7 @@ export default function ProductsPage() {
         onOk={handleModalOk}
         onCancel={() => setModalOpen(false)}
         width={800}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <div style={{ display: 'flex', gap: 20 }}>
@@ -279,7 +279,7 @@ export default function ProductsPage() {
                     setImageFile(file);
                     setImageFileList([file as any]);
                     setRemoveImage(false);
-                    return false; // Ngăn auto upload
+                    return false;
                   }}
                   onRemove={() => {
                     setImageFile(null);

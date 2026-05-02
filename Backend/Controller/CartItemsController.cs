@@ -114,7 +114,7 @@ namespace Controllers
             if (userId == null) return Unauthorized("Không tìm thấy người dùng.");
 
             var cartItems = await _context.cartItems
-                .IgnoreQueryFilters() // Lấy cả những sản phẩm đã bị IsDeleted = true
+                .IgnoreQueryFilters()
                 .Where(c => c.UserId == userId)
                 .Include(c => c.ProductVariant)
                     .ThenInclude(v => v.Product)
@@ -125,7 +125,6 @@ namespace Controllers
                 cartItemId = c.CartItemId,
                 productVariantId = c.ProductVariantId,
                 quantity = c.Quantity,
-                // Kiểm tra xem sản phẩm còn kinh doanh không
                 isAvailable = c.ProductVariant != null && c.ProductVariant.Product != null && !c.ProductVariant.Product.IsDeleted,
                 variant = c.ProductVariant == null ? null : new
                 {

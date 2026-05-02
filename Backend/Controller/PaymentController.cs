@@ -48,7 +48,6 @@ namespace Controllers
             Promotion? selectedPromo = null;
             UserPromotion? userPromo = null;
 
-            // KIỂM TRA MÃ VOUCHER NGƯỜI DÙNG ÁP DỤNG THỦ CÔNG
             if (dto.PromoId.HasValue)
             {
                 selectedPromo = await _context.promotions
@@ -72,7 +71,6 @@ namespace Controllers
             decimal totalAmount = 0;
             var productBreakdown = new List<object>();
 
-            // TÍNH TỔNG TIỀN (Dựa trên UnitPrice ĐÃ SALE từ OrderController)
             foreach (var od in order.OrderDetails)
             {
                 if (od.Quantity > od.ProductVariant.Instock)
@@ -95,7 +93,6 @@ namespace Controllers
                 });
             }
 
-            // ÁP DỤNG MÃ VOUCHER (Nếu có) VÀO TỔNG TIỀN
             decimal voucherDiscountPercent = selectedPromo != null ? (decimal)selectedPromo.DiscountPercent : 0;
             decimal finalAmount = totalAmount * (1 - voucherDiscountPercent / 100);
 
@@ -112,21 +109,20 @@ namespace Controllers
 
             _context.payments.Add(payment);
 
-            // LOGIC TRỪ KHO NẾU LÀ THANH TOÁN COD (VNPay sẽ trừ lúc Callback thành công)
             if (dto.PaymentMethod.ToUpper() == "COD")
             {
                 foreach (var od in order.OrderDetails)
                 {
-                    od.ProductVariant.Instock -= od.Quantity; // Trừ kho
+                    od.ProductVariant.Instock -= od.Quantity;
                 }
                 
                 if (userPromo != null)
                 {
-                    userPromo.IsUsed = true; // Đánh dấu đã dùng Voucher
+                    userPromo.IsUsed = true;
                     userPromo.UsedAt = DateTime.UtcNow;
                 }
                 
-                order.OrderStatus = "Processing"; // Chuyển trạng thái đơn hàng luôn
+                order.OrderStatus = "Processing";
             }
 
             await _context.SaveChangesAsync();
@@ -182,7 +178,6 @@ namespace Controllers
             if (payment.Order.UserId != userId) return Unauthorized();
             if (payment.Status == PaymentStatus.Paid) return BadRequest(new { message = "Không thể hủy payment đã thanh toán." });
 
-            // NẾU LÀ ĐƠN COD (Đã trừ kho lúc tạo) THÌ PHẢI HOÀN LẠI KHO VÀ VOUCHER
             if (payment.PaymentMethod.ToUpper() == "COD" && payment.Status != PaymentStatus.Cancelled)
             {
                 foreach (var od in payment.Order.OrderDetails)
@@ -220,7 +215,6 @@ namespace Controllers
             if (!Enum.TryParse<PaymentStatus>(newStatus, out var status))
                 return BadRequest(new { message = "Trạng thái không hợp lệ." });
 
-            // Logic hoàn kho nếu Admin hủy đơn COD hoặc đơn đã Paid
             if ((status == PaymentStatus.Cancelled || status == PaymentStatus.Failed) 
                 && payment.Status != PaymentStatus.Cancelled 
                 && payment.Status != PaymentStatus.Failed)
@@ -428,14 +422,12 @@ namespace Controllers
                 payment.Status = PaymentStatus.Paid;
                 payment.Order.OrderStatus = "Paid";
 
-                // TRỪ KHO KHI VNPAY THÀNH CÔNG
                 foreach (var od in payment.Order.OrderDetails)
                 {
                     if (od.ProductVariant != null)
                         od.ProductVariant.Instock -= od.Quantity;
                 }
 
-                // ĐÁNH DẤU SỬ DỤNG VOUCHER KHI VNPAY THÀNH CÔNG
                 if (payment.PromoId.HasValue && payment.Promotion != null)
                 {
                     var userPromo = payment.Promotion.UserPromotions.FirstOrDefault(up => !up.IsUsed && up.UserId == payment.Order.UserId);

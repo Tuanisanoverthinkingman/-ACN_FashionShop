@@ -1,7 +1,6 @@
 import api from "./api";
 import { toast } from "react-toastify";
 
-// Khai báo interface User
 export interface User {
   id: number;
   fullName: string;
@@ -13,7 +12,6 @@ export interface User {
   isVerified: boolean;
 }
 
-// Lấy tất cả user
 export const getAllUsers = async (): Promise<User[]> => {
   try {
     const res = await api.get("/api/users/getAll");
@@ -23,17 +21,15 @@ export const getAllUsers = async (): Promise<User[]> => {
   }
 };
 
-// Lấy user theo id
 export const getUserById = async (id: number): Promise<User> => {
   try {
-    const res = await api.get(`/api/users/${id}`);
+    const res = await api.get(`/api/users/detail/${id}`);
     return res.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Lấy user hiện tại (me)
 export const getCurrentUser = async (): Promise<User> => {
   try {
     const res = await api.get("/api/users/me");
@@ -43,18 +39,17 @@ export const getCurrentUser = async (): Promise<User> => {
   }
 };
 
-// Tạo user bình thường
 export const createUser = async (data: any): Promise<User> => {
   try {
-    const res = await api.post("/api/users/User", data);
-    toast.success("Tạo user thành công");
+    const endpoint = data.role === "Admin" ? "/api/users/Admin" : "/api/users/User";
+    const res = await api.post(endpoint, data);
+    toast.success("Tạo người dùng thành công");
     return res.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Cập nhật thông tin user hiện tại
 export const updateMe = async (data: any): Promise<User> => {
   try {
     const res = await api.put("/api/users/update", data);
@@ -65,7 +60,6 @@ export const updateMe = async (data: any): Promise<User> => {
   }
 };
 
-// Đổi mật khẩu
 export const updatePassword = async (id: number, oldPassword: string, newPassword: string): Promise<any> => {
   try {
     const res = await api.put(`/api/users/${id}/change-password`, {
@@ -79,7 +73,6 @@ export const updatePassword = async (id: number, oldPassword: string, newPasswor
   }
 };
 
-// Xóa user
 export const deleteUser = async (id: number): Promise<void> => {
   try {
     await api.delete(`/api/users/${id}`);
@@ -92,6 +85,15 @@ export const deleteUser = async (id: number): Promise<void> => {
 export const updateIsActive = async (id: number): Promise<any> => {
   try {
     const res = await api.put(`/api/users/${id}/toggle-active`);
+    return res.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateUser = async (id: number, data: any): Promise<any> => {
+  try {
+    const res = await api.put(`/api/users/${id}`, data);
     return res.data;
   } catch (error) {
     throw error;

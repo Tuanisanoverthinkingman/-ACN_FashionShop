@@ -42,6 +42,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
             RoleClaimType = ClaimTypes.Role
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.ContainsKey("token"))
+                {
+                    context.Token = context.Request.Cookies["token"];
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddCors(options =>
@@ -95,9 +106,8 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
-    
-});
 
+});
 
 var app = builder.Build();
 
@@ -111,7 +121,6 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Ecommerce API v1");
         c.RoutePrefix = string.Empty;
     });
-    // Tự động mở Swagger UI trên trình duyệt mặc định
     var swaggerUrl = "http://localhost:5146";
     try
     {
@@ -130,8 +139,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
-
-// Kích hoạt Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 

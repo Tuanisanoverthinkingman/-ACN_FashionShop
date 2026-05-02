@@ -19,7 +19,6 @@ export default function ProductBanner() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Lấy sản phẩm, danh mục, promotion
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -40,13 +39,11 @@ export default function ProductBanner() {
     fetchData();
   }, []);
 
-  // --- Helper: Lấy giá nhỏ nhất của Sản phẩm ---
   const getMinPrice = (product: Product) => {
     if (!product.productVariants || product.productVariants.length === 0) return 0;
     return Math.min(...product.productVariants.map(v => v.price));
   };
 
-  // --- Filter + Search + Sort ---
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
@@ -72,7 +69,6 @@ export default function ProductBanner() {
     currentPage * PRODUCTS_PER_PAGE
   );
 
-  // --- Tính % giảm giá lớn nhất cho sản phẩm ---
   const getDiscountPercent = (product: Product) => {
     const applicablePromos = promotions.filter(promo => {
       switch (promo.applyType) {
@@ -185,8 +181,6 @@ export default function ProductBanner() {
               const basePrice = getMinPrice(product);
               const maxDiscountPercent = getDiscountPercent(product);
               const discountedPrice = basePrice * (1 - maxDiscountPercent / 100);
-
-              // Lọc và đếm số lượng màu sắc duy nhất (loại bỏ giá trị rỗng hoặc "Mặc định")
               const uniqueColors = Array.from(new Set(product.productVariants?.map(v => v.color))).filter(c => c && c !== "Mặc định");
               const colorCount = uniqueColors.length;
 

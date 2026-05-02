@@ -31,7 +31,6 @@ namespace Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public DateTime CreateAt { get; set; } = DateTime.UtcNow;
 
-        //Liên kết 1 - N tới bảng ProductVariant
         public ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 
         public ICollection<PromotionProduct> PromotionProducts { get; set; }

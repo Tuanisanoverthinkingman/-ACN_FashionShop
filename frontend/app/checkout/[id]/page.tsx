@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getOrderDetailsForUser } from "@/services/orderdetail-services";
 import { createPayment, createVnPayUrl } from "@/services/payment-services";
+import { getActivePromotions, Promotion } from "@/services/promotion-services";
 import {
   getMyPromotions,
   getApplicablePromotionsForProduct,
@@ -15,7 +16,6 @@ import { toast } from "react-toastify";
 
 interface OrderDetail {
   orderDetailId: number;
-  // Cập nhật cấu trúc để tương thích với Backend
   productVariant?: {
     product?: {
       id: number;
@@ -48,10 +48,9 @@ export default function CheckoutPage() {
   const router = useRouter();
   const numericOrderId = Number(params.id);
 
-  // State & refs
   const [order, setOrder] = useState<Order | null>(null);
-  const [autoPromotions, setAutoPromotions] = useState<UserPromotion[]>([]); 
-  const [genPromotions, setGenPromotions] = useState<UserPromotion[]>([]);   
+  const [autoPromotions, setAutoPromotions] = useState<Promotion[]>([]);
+  const [genPromotions, setGenPromotions] = useState<UserPromotion[]>([]);
   const [promoId, setPromoId] = useState<number | undefined>();
   const [address, setAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("COD");
@@ -89,28 +88,12 @@ export default function CheckoutPage() {
 
     const fetchPromos = async () => {
       try {
-        // 1. GEN/User
-        const myPromos = await getMyPromotions();
-        const gen = myPromos.filter(
-          p => p.applyType === PromotionApplyType.User || p.applyType === PromotionApplyType.General
-        );
-        setGenPromotions(gen);
+        const activePromos = await getActivePromotions();
+        setAutoPromotions(activePromos || []);
 
-        // 2. Auto Product/Category
-        const prodPromoLists = await Promise.all(
-          order.orderDetails.map(od => {
-            const prodInfo = od.productVariant?.product || od.product;
-            const actualProductId = prodInfo?.id || od.productId || 0;
-            const actualCategoryId = prodInfo?.categoryId || od.categoryId;
-            
-            return getApplicablePromotionsForProduct(actualProductId, actualCategoryId);
-          })
-        );
-        
-        const auto = Array.from(
-          new Map(prodPromoLists.flat().map(p => [p.promotionId, p])).values()
-        );
-        setAutoPromotions(auto);
+        const myPromos = await getMyPromotions();
+        const vouchers = myPromos.filter(p => p.applyType === PromotionApplyType.User);
+        setGenPromotions(vouchers);
 
       } catch {
         toast.error("Không tải được danh sách khuyến mãi hợp lệ");
@@ -119,9 +102,7 @@ export default function CheckoutPage() {
 
     fetchPromos();
   }, [order]);
-
-  // Product breakdown & total
-  const productBreakdown = useMemo(() => {
+const productBreakdown = useMemo(() => {
     if (!order) return [];
 
     return order.orderDetails.map(od => {
@@ -129,21 +110,23 @@ export default function CheckoutPage() {
       const actualProductId = prodInfo?.id || od.productId || 0;
       const actualCategoryId = prodInfo?.categoryId || od.categoryId;
 
-      // Auto promo (Product/Category)
-      const autoPromo = autoPromotions.find(p => {
-        if (p.applyType === PromotionApplyType.Product && p.productIds?.includes(actualProductId)) return true;
-        if (p.applyType === PromotionApplyType.Category && actualCategoryId && p.categoryIds?.includes(actualCategoryId)) return true;
-        return false;
+      const applicableAutoPromos = autoPromotions.filter(promo => {
+        switch (promo.applyType) {
+          case PromotionApplyType.General: return true;
+          case PromotionApplyType.Product: return promo.productIds?.includes(actualProductId);
+          case PromotionApplyType.Category: return actualCategoryId ? promo.categoryIds?.includes(actualCategoryId) : false;
+          default: return false;
+        }
       });
 
-      const autoDiscount = autoPromo ? autoPromo.discountPercent : 0;
+      const autoDiscount = applicableAutoPromos.length > 0 
+          ? Math.max(...applicableAutoPromos.map(p => p.discountPercent)) 
+          : 0;
 
-      // GEN/User promo do user chọn
       const selectedPromo = promoId ? genPromotions.find(p => p.promotionId === promoId) : undefined;
-      const genDiscount = selectedPromo ? selectedPromo.discountPercent : 0;
+      const voucherDiscount = selectedPromo ? selectedPromo.discountPercent : 0;
 
-      // Max discount
-      const totalDiscount = Math.max(autoDiscount, genDiscount);
+      const totalDiscount = Math.max(autoDiscount, voucherDiscount);
 
       const originalAmount = od.unitPrice * od.quantity;
       const discountedAmount = originalAmount * (1 - totalDiscount / 100);
@@ -163,7 +146,6 @@ export default function CheckoutPage() {
   const totalOriginal = productBreakdown.reduce((sum, p) => sum + p.originalAmount, 0);
   const finalAmount = productBreakdown.reduce((sum, p) => sum + p.discountedAmount, 0);
 
-  // Handle payment
   const handlePayment = async () => {
     if (!order) return;
     if (!address.trim()) return toast.warning("Vui lòng nhập địa chỉ giao hàng!");
@@ -177,9 +159,9 @@ export default function CheckoutPage() {
       };
       if (promoId) payload.promoId = promoId;
 
-      const payment = await createPayment(payload); 
-      
-      const createdPaymentId = payment.payment?.paymentId || payment.paymentId; // Dự phòng cấu trúc backend
+      const payment = await createPayment(payload);
+
+      const createdPaymentId = payment.payment?.paymentId || payment.paymentId;
 
       if (paymentMethod === "VNPAY") {
         if (!createdPaymentId) {
@@ -188,7 +170,7 @@ export default function CheckoutPage() {
         }
         const vnPayData = await createVnPayUrl(createdPaymentId);
         if (vnPayData?.paymentUrl) {
-          window.location.href = vnPayData.paymentUrl; 
+          window.location.href = vnPayData.paymentUrl;
           return;
         } else {
           toast.error("Tạo link VNPay thất bại");
@@ -235,14 +217,14 @@ export default function CheckoutPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 space-y-5">
         <h2 className="text-xl font-bold text-gray-800 border-b pb-2">Thông tin giao hàng</h2>
-        
+
         <div>
           <label className="block font-medium mb-1.5 text-gray-700">Địa chỉ nhận hàng <span className="text-red-500">*</span></label>
-          <input 
-            className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" 
+          <input
+            className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
             placeholder="Nhập địa chỉ nhận hàng của bạn..."
-            value={address} 
-            onChange={(e) => setAddress(e.target.value)} 
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
           />
         </div>
 
@@ -253,13 +235,13 @@ export default function CheckoutPage() {
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
           >
-            <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+            <option value="COD">Thanh toán khi nhận hàng</option>
             <option value="VNPAY">Thanh toán qua VNPay</option>
           </select>
         </div>
 
         <div ref={dropdownRef} className="relative">
-          <label className="block font-medium mb-1.5 text-gray-700">Mã khuyến mãi (Voucher)</label>
+          {/* <label className="block font-medium mb-1.5 text-gray-700">Mã khuyến mãi (Voucher)</label>
           <div
             className="w-full border border-gray-300 rounded-lg p-2.5 cursor-pointer flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition"
             onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -270,9 +252,9 @@ export default function CheckoutPage() {
                 : "-- Chọn mã khuyến mãi --"}
             </span>
             <span className="text-gray-400">▼</span>
-          </div>
-          
-          {dropdownOpen && (
+          </div> */}
+
+          {/* {dropdownOpen && (
             <ul className="absolute z-10 w-full border border-gray-200 bg-white rounded-lg shadow-xl mt-2 max-h-60 overflow-auto">
               <li
                 className="p-3 cursor-pointer hover:bg-blue-50 text-gray-600 border-b border-gray-100"
@@ -294,7 +276,7 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -324,7 +306,7 @@ export default function CheckoutPage() {
             Đang xử lý...
           </>
         ) : (
-          "Xác nhận Thanh Toán"
+          "Thanh toán"
         )}
       </button>
     </div>

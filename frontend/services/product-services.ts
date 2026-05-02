@@ -40,7 +40,11 @@ export interface UploadExcelResult {
   errors?: string[];
 }
 
-// Helper handle lỗi
+export interface QuickSearchResponse {
+  categories: { id: number; name: string }[];
+  products: { id: number; name: string; imageUrl: string }[];
+}
+
 const handleError = (error: any) => {
   if (error.response?.data?.message) {
     toast.error(error.response.data.message);
@@ -108,7 +112,6 @@ export const deleteProduct = async (id: number): Promise<void> => {
   }
 };
 
-// Upload Excel
 export const uploadExcelSheets = async (file: File): Promise<UploadExcelResult | undefined> => {
   try {
     const formData = new FormData();
@@ -152,7 +155,6 @@ export const getSaleProducts = async (keyword?: string): Promise<Product[]> => {
   }
 };
 
-// Lấy toàn bộ sản phẩm cho Admin (Thấy cả hàng đã xóa mềm)
 export const getAllForAdmin = async (): Promise<Product[] | undefined> => {
   try {
     const res = await api.get("/api/products/admin-all");
@@ -162,12 +164,22 @@ export const getAllForAdmin = async (): Promise<Product[] | undefined> => {
   }
 };
 
-// Khôi phục sản phẩm đã bị xóa mềm
 export const restoreProduct = async (id: number): Promise<void> => {
   try {
     const res = await api.put(`/api/products/restore/${id}`);
     toast.success(res.data.message || "Khôi phục sản phẩm thành công");
   } catch (error) {
     handleError(error);
+  }
+};
+
+export const quickSearch = async (query: string): Promise<QuickSearchResponse | null> => {
+  try {
+    const res = await fetch(`http://localhost:5146/api/products/quick-search?query=${encodeURIComponent(query)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.error("Lỗi khi tìm kiếm nhanh:", error);
+    return null;
   }
 };

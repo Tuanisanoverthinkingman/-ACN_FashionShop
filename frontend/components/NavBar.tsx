@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, Search, User, ChevronDown } from "lucide-react";
+import { ShoppingCart, Search, User, ChevronDown, X, ArrowRight } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getCart } from "@/services/cart-services";
 import { logout } from "@/services/auth-services";
+import { quickSearch, QuickSearchResponse } from "@/services/product-services";
 
-// --- Danh sách Menu ---
+
 const NAV_MENU = [
   { name: "SALE", path: "/sale", hasDropdown: true },
   { name: "ÁO", path: "/collections/ao", hasDropdown: true },
@@ -15,7 +16,6 @@ const NAV_MENU = [
   { name: "PHỤ KIỆN", path: "/collections/phu-kien", hasDropdown: true },
 ];
 
-// --- Hook kiểm tra user ---
 const useUser = () => {
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -33,7 +33,6 @@ const useUser = () => {
   return userName;
 };
 
-// --- Hook cart count ---
 const useCartCount = () => {
   const [cartCount, setCartCount] = useState(0);
 
@@ -57,29 +56,45 @@ const useCartCount = () => {
   return cartCount;
 };
 
-// COMPONENT CHÍNH: NAVBAR
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
-
   const userName = useUser();
   const cartCount = useCartCount();
   const [showMenu, setShowMenu] = useState(false);
 
-  const navBgClass = "bg-white dark:bg-[#1a1814] text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 shadow-sm";
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<QuickSearchResponse>({ categories: [], products: [] });
 
-  // --- CẤU HÌNH MÀU MEGA MENU VÀ NỘI DUNG BÊN TRONG ---
+  const navBgClass = "bg-white dark:bg-[#1a1814] text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 shadow-sm";
   const megaMenuClass = "bg-white dark:bg-[#1a1814] border-t border-gray-100 dark:border-gray-800 text-gray-800 dark:text-white shadow-xl";
   const titleClass = "text-gray-900 dark:text-white border-gray-200 dark:border-gray-700";
   const linkClass = "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white font-medium";
-
-  // Scroll đến search section
   const handleSearchScroll = () => {
     const section = document.getElementById("search");
     if (section) {
       const y = section.getBoundingClientRect().top + window.scrollY - 160;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
+  };
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (searchQuery.trim().length > 0) {
+        const data = await quickSearch(searchQuery);
+        if (data) setSearchResults(data);
+      } else {
+        setSearchResults({ categories: [], products: [] });
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
   };
 
   // Click ngoài menu user
@@ -129,7 +144,7 @@ export default function NavBar() {
               {item.name === "SALE" && (
                 <div className={`absolute left-0 top-full mt-1 w-[320px] border transition-all duration-300 z-50 cursor-default opacity-0 invisible group-hover:opacity-100 group-hover:visible ${megaMenuClass}`}>
                   <div className="p-5 flex flex-col gap-6">
-                    
+
                     {/* Nhóm 1: Quần Áo */}
                     <div>
                       <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
@@ -318,8 +333,6 @@ export default function NavBar() {
               {item.name === "PHỤ KIỆN" && (
                 <div className={`absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[1000px] border transition-all duration-300 z-50 cursor-default opacity-0 invisible group-hover:opacity-100 group-hover:visible ${megaMenuClass}`}>
                   <div className="p-4 grid grid-cols-4 gap-x-8 gap-y-4">
-                    
-                    {/* ====== HÀNG 1 ====== */}
                     {/* 1. NÓN */}
                     <div>
                       <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
@@ -373,7 +386,6 @@ export default function NavBar() {
                       </ul>
                     </div>
 
-                    {/* ====== HÀNG 2 ====== */}
                     {/* 5. DÂY NỊT */}
                     <div>
                       <h4 className={`text-[13px] font-semibold mb-4 flex items-center gap-2 border-b pb-2 uppercase tracking-wider ${titleClass}`}>
@@ -436,10 +448,105 @@ export default function NavBar() {
 
         {/* 3. Phần Phải: Icons */}
         <div className="flex-1 flex items-center justify-end gap-5 md:gap-6">
-          {/* Search */}
-          <button onClick={handleSearchScroll} className="hover:opacity-70 transition-opacity">
-            <Search size={20} strokeWidth={1.5} />
-          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="hover:opacity-70 transition-opacity flex items-center"
+            >
+              <Search size={20} strokeWidth={1.5} />
+            </button>
+
+            {isSearchOpen && (
+              <div className="absolute right-0 top-10 mt-2 w-[350px] md:w-[600px] bg-white dark:bg-[#1c1c1c] text-gray-900 dark:text-white/90 shadow-2xl rounded-sm border border-gray-200 dark:border-[#333] overflow-hidden flex flex-col font-sans z-50">
+
+                {/* Header: Thanh nhập liệu */}
+                <div className="flex items-center px-4 py-3 border-b border-gray-200 dark:border-[#333]">
+                  <div className="flex-1 flex flex-col">
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Tìm kiếm</span>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent border-none text-gray-900 dark:text-white text-base focus:ring-0 outline-none w-full placeholder-gray-400 dark:placeholder-gray-600"
+                      placeholder="Tìm kiếm"
+                    />
+                  </div>
+                  <button onClick={closeSearch} className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#333] rounded-full transition text-gray-500 dark:text-gray-400">
+                    <X size={16} />
+                  </button>
+                  <Search size={18} className="ml-3 text-gray-500 dark:text-gray-400" />
+                </div>
+
+                {searchQuery.trim().length > 0 && (
+                  <div className="flex flex-col md:flex-row p-6 min-h-[300px]">
+
+                    {/* Cột 1: GỢI Ý (Danh mục) */}
+                    <div className="w-full md:w-1/3 md:border-r border-gray-200 dark:border-[#333] md:pr-6 mb-6 md:mb-0">
+                      <h4 className="text-[11px] text-gray-500 uppercase tracking-widest mb-5 font-semibold">Gợi ý</h4>
+                      <ul className="space-y-4">
+                        {searchResults.categories?.map((cat) => (
+                          <li key={cat.id}>
+                            <Link
+                              href={`/collections/${cat.id}`}
+                              onClick={closeSearch}
+                              className="text-[15px] text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-gray-300 transition block"
+                            >
+                              {cat.name}
+                            </Link>
+                          </li>
+                        ))}
+                        {(!searchResults.categories || searchResults.categories.length === 0) && (
+                          <p className="text-sm text-gray-400 dark:text-gray-500 italic">Không có gợi ý</p>
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Cột 2: SẢN PHẨM */}
+                    <div className="w-full md:w-2/3 md:pl-6">
+                      <h4 className="text-[11px] text-gray-500 uppercase tracking-widest mb-5 font-semibold">Sản phẩm</h4>
+                      <div className="space-y-4">
+                        {searchResults.products?.map((prod) => (
+                          <Link
+                            key={prod.id}
+                            href={`/product/${prod.id}`}
+                            onClick={closeSearch}
+                            className="flex items-center gap-4 group"
+                          >
+                            <img
+                              src={prod.imageUrl || "/image/default.jpg"}
+                              alt={prod.name}
+                              className="w-14 h-16 object-cover bg-gray-50 dark:bg-white rounded-sm border border-gray-100 dark:border-none"
+                            />
+                            <p className="text-[14px] text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-gray-300 transition line-clamp-2 leading-relaxed">
+                              {prod.name}
+                            </p>
+                          </Link>
+                        ))}
+                        {(!searchResults.products || searchResults.products.length === 0) && (
+                          <p className="text-sm text-gray-400 dark:text-gray-500 italic">Không tìm thấy sản phẩm</p>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* Footer: Nút xem tất cả */}
+                {searchQuery.trim().length > 0 && (
+                  <Link
+                    href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                    onClick={closeSearch}
+                    className="flex justify-between items-center px-6 py-4 bg-gray-50 dark:bg-[#242424] hover:bg-gray-100 dark:hover:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white transition border-t border-gray-200 dark:border-[#333] cursor-pointer"
+                  >
+                    <span className="text-[14px] font-medium">Tìm kiếm "{searchQuery}"</span>
+                    <ArrowRight size={16} className="text-gray-400" />
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* User */}
           {userName ? (

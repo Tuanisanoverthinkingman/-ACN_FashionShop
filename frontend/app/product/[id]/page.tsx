@@ -44,7 +44,6 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
         setProduct(data || null);
 
         if (data && data.productVariants && data.productVariants.length > 0) {
-          // Mặc định chọn biến thể đầu tiên còn hàng
           const initialVariant = data.productVariants.find(v => v.instock > 0) || data.productVariants[0];
           setSelectedColor(initialVariant.color || "Mặc định");
           setSelectedVariant(initialVariant);
@@ -101,9 +100,10 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       return;
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
+    const isLogged = localStorage.getItem("user");
+    if (!isLogged) {
+      const currentPath = encodeURIComponent(`/product/${product.id}`);
+      router.push(`/login?redirect=${currentPath}`);
       return;
     }
 
@@ -124,9 +124,10 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       toast.warning("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
       return;
     }
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
+    const isLogged = localStorage.getItem("user");
+    if (!isLogged) {
+      const currentPath = encodeURIComponent(`/product/${product.id}`);
+      router.push(`/login?redirect=${currentPath}`);
       return;
     }
     try {
@@ -135,7 +136,9 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
       router.push(`/checkout/${res.orderId}`);
     } catch (err: any) {
       if (err.response?.status === 401) {
-        router.push("/login");
+        localStorage.removeItem("user");
+        const currentPath = encodeURIComponent(`/product/${product.id}`);
+        router.push(`/login?redirect=${currentPath}`);
         return;
       }
       toast.error(err.response?.data?.message || "Mua ngay thất bại");
@@ -151,7 +154,6 @@ export default function ProductPage({ currentUserId, isAdmin }: { currentUserId:
   const discountedPrice = currentPrice * (1 - maxDiscountPercent / 100);
   const hasDiscount = maxDiscountPercent > 0;
 
-  // QUAN TRỌNG: Ưu tiên lấy ảnh của biến thể màu đang chọn để tạo hiệu ứng đổi ảnh
   const displayImage = selectedVariant?.imageUrl || product.imageUrl || "/images/default.jpg";
 
   return (

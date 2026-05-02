@@ -7,6 +7,7 @@ import { getPromotionById, Promotion } from "@/services/promotion-services";
 import { getOrderDetailsForAdmin } from "@/services/orderdetail-services";
 import { toast } from "react-toastify";
 import { updatePaymentStatus } from "@/services/payment-services";
+import { Pagination } from "antd";
 
 interface OrderDetail {
   orderDetailId: number;
@@ -41,10 +42,12 @@ export default function AdminOrdersPage() {
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage, setOrdersPerPage] = useState(10);
+
   const getStatusBadge = (status: string | number) => {
     const statusStr = String(status).toLowerCase();
 
-    // Bản đồ từ vựng kết hợp class màu của Tailwind
     const statusMap: Record<string, { bg: string, text: string, label: string }> = {
       "pending": { bg: "bg-yellow-100", text: "text-yellow-700", label: "Chờ thanh toán" },
       "0": { bg: "bg-yellow-100", text: "text-yellow-700", label: "Chờ thanh toán" },
@@ -122,6 +125,15 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, []);
 
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    setCurrentPage(page);
+    setOrdersPerPage(pageSize);
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -137,7 +149,7 @@ export default function AdminOrdersPage() {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -150,8 +162,8 @@ export default function AdminOrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {orders.length > 0 ? (
-                    orders.map((o) => (
+                  {currentOrders.length > 0 ? (
+                    currentOrders.map((o) => (
                       <tr key={o.orderId} className="hover:bg-gray-50 transition-colors">
                         <td className="p-4 text-sm font-medium text-gray-800">#{o.orderId}</td>
                         <td className="p-4 text-sm text-gray-500">
@@ -172,21 +184,6 @@ export default function AdminOrdersPage() {
                           >
                             Xem chi tiết
                           </button>
-                          <button
-                            className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-600 hover:text-white transition-colors"
-                            onClick={async () => {
-                              if (!confirm(`Bạn có chắc chắn muốn xóa đơn hàng #${o.orderId}? Hành động này không thể hoàn tác!`)) return;
-                              try {
-                                await deleteOrder(o.orderId);
-                                toast.success("Xóa đơn hàng thành công");
-                                fetchOrders();
-                              } catch (err) {
-                                toast.error("Xóa đơn hàng thất bại");
-                              }
-                            }}
-                          >
-                            Xoá
-                          </button>
                         </td>
                       </tr>
                     ))
@@ -200,6 +197,19 @@ export default function AdminOrdersPage() {
                 </tbody>
               </table>
             </div>
+
+            {orders.length > 0 && (
+              <div className="flex justify-end px-6 py-4 bg-white border-t border-gray-200">
+                <Pagination
+                  current={currentPage}
+                  total={orders.length}
+                  pageSize={ordersPerPage}
+                  onChange={handlePageChange}
+                  showSizeChanger={true}
+                  pageSizeOptions={['10', '20', '50']}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -304,7 +314,7 @@ export default function AdminOrdersPage() {
                             }
                           }}
                         >
-                          {updating ? "Đang xử lý..." : "Xác nhận Đã Thanh Toán"}
+                          {updating ? "Đang xử lý..." : "Xác nhận đã thanh toán"}
                         </button>
                       )}
                     </div>

@@ -17,7 +17,6 @@ namespace Controllers
             _context = context;
         }
 
-        // Helper lấy UserId và Role
         private (int userId, string role) GetUserInfo()
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -38,7 +37,6 @@ namespace Controllers
                 .Include(f => f.User)
                 .Include(f => f.Product);
 
-            // Nếu là User thường thì chỉ lấy feedback của họ (bao gồm cả bị ẩn)
             if (role != "Admin")
             {
                 query = query.Where(f => f.UserId == userId);
